@@ -10,7 +10,8 @@ import {
   ClipboardList, 
   LogOut,
   Menu,
-  X
+  X,
+  UserPlus
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -62,6 +63,7 @@ const Layout = ({ children }: LayoutProps) => {
     ...(isAdmin ? [
       { name: "Rues & Segments", href: "/streets", icon: Map },
       { name: "Campagnes", href: "/campaigns", icon: ClipboardList },
+      { name: "Assignations", href: "/assignments", icon: UserPlus },
       { name: "Utilisateurs", href: "/users", icon: Users },
     ] : []),
   ];

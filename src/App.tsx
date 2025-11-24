@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Volunteer from "./pages/Volunteer";
 import Streets from "./pages/Streets";
 import Campaigns from "./pages/Campaigns";
+import Assignments from "./pages/Assignments";
 import Users from "./pages/Users";
 import NotFound from "./pages/NotFound";
 
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/volunteer" element={<Layout><Volunteer /></Layout>} />
           <Route path="/streets" element={<Layout><Streets /></Layout>} />
           <Route path="/campaigns" element={<Layout><Campaigns /></Layout>} />
+          <Route path="/assignments" element={<Layout><Assignments /></Layout>} />
           <Route path="/users" element={<Layout><Users /></Layout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
