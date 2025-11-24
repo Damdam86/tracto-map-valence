@@ -312,15 +312,12 @@ const MapView = () => {
               style={{ height: "100%", width: "100%" }}
               scrollWheelZoom={true}
             >
-              <MapUpdater center={center} />
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              
+              <MapUpdater center={center} />
               {streets.map((street) => {
-                // Note: Dans une vraie application, il faudrait les coordonnées GPS réelles
-                // Pour l'instant, on affiche juste une ligne fictive autour du centre
                 const offset = Math.random() * 0.01;
                 const line: [number, number][] = [
                   [center[0] + offset, center[1] + offset],
