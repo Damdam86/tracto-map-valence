@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline } from "react-leaflet";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import StreetPolyline from "@/components/StreetPolyline";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -315,12 +314,14 @@ const MapView = () => {
                 ];
                 
                 return (
-                  <StreetPolyline
+                  <Polyline
                     key={street.id}
-                    street={street}
                     positions={line}
-                    color={getStreetColor(street)}
-                    status={getStreetStatus(street)}
+                    pathOptions={{
+                      color: getStreetColor(street),
+                      weight: 4,
+                      opacity: 0.8,
+                    }}
                   />
                 );
               })}
