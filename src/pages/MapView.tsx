@@ -27,6 +27,8 @@ interface StreetWithStatus {
   segments: Array<{
     id: string;
     status: string;
+    number_start: number;
+    number_end: number;
   }>;
 }
 
@@ -101,8 +103,13 @@ const MapView = () => {
           opacity: 0.8,
         }).addTo(mapRef.current!);
 
+        // Calculate min and max numbers for this street
+        const allNumbers = street.segments.flatMap(s => [s.number_start, s.number_end]);
+        const minNumber = Math.min(...allNumbers);
+        const maxNumber = Math.max(...allNumbers);
+        
         polyline.bindTooltip(
-          `<strong>${street.name}</strong><br/>${getStreetStatus(street)} - ${street.segments.length} segment(s)`,
+          `<strong>${street.name}</strong><br/>${getStreetStatus(street)}<br/>N° ${minNumber} à ${maxNumber} (${street.segments.length} segment${street.segments.length > 1 ? 's' : ''})`,
           { direction: 'top' }
         );
 
@@ -147,6 +154,8 @@ const MapView = () => {
           status,
           segment:segments (
             id,
+            number_start,
+            number_end,
             street:streets (
               id,
               name,
@@ -178,6 +187,8 @@ const MapView = () => {
         streetsMap.get(streetId)!.segments.push({
           id: cs.segment.id,
           status: cs.status,
+          number_start: cs.segment.number_start,
+          number_end: cs.segment.number_end,
         });
       });
 
@@ -321,32 +332,31 @@ const MapView = () => {
       <Card>
         <CardHeader>
           <CardTitle>Carte de Portes-lès-Valence</CardTitle>
-          <CardDescription>
-            <div className="flex flex-wrap gap-4 mt-2">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.todo }} />
-                <span className="text-xs">À faire</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.in_progress }} />
-                <span className="text-xs">En cours</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.done }} />
-                <span className="text-xs">Terminé</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.redo }} />
-                <span className="text-xs">À refaire</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.mixed }} />
-                <span className="text-xs">Statut mixte</span>
-              </div>
-            </div>
-          </CardDescription>
+          <CardDescription>Légende des couleurs</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-wrap gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.todo }} />
+              <span className="text-xs">À faire</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.in_progress }} />
+              <span className="text-xs">En cours</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.done }} />
+              <span className="text-xs">Terminé</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.redo }} />
+              <span className="text-xs">À refaire</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.mixed }} />
+              <span className="text-xs">Statut mixte</span>
+            </div>
+          </div>
           <div 
             ref={mapContainerRef}
             className="w-full h-[600px] rounded-lg overflow-hidden border"
