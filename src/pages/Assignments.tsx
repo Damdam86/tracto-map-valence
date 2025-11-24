@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { UserPlus, Users, MapPin, Target, CheckCircle2, Circle, AlertCircle, Clock } from "lucide-react";
 
@@ -30,10 +32,15 @@ interface CampaignSegment {
   segment_id: string;
   status: string;
   assigned_to_user_id: string | null;
+  assigned_to_team_id: string | null;
   segment: Segment;
   assignedUser?: {
     first_name: string;
     last_name: string;
+  };
+  assignedTeam?: {
+    name: string;
+    color: string;
   };
 }
 
@@ -44,15 +51,24 @@ interface Volunteer {
   email: string;
 }
 
+interface Team {
+  id: string;
+  name: string;
+  color: string;
+}
+
 const Assignments = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [campaignSegments, setCampaignSegments] = useState<CampaignSegment[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<CampaignSegment | null>(null);
   const [selectedVolunteer, setSelectedVolunteer] = useState<string>("");
+  const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [assignType, setAssignType] = useState<"user" | "team">("user");
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   useEffect(() => {
@@ -67,18 +83,20 @@ const Assignments = () => {
 
   const fetchInitialData = async () => {
     try {
-      const [campaignsRes, volunteersRes] = await Promise.all([
+      const [campaignsRes, volunteersRes, teamsRes] = await Promise.all([
         supabase.from("campaigns").select("id, name, status").order("created_at", { ascending: false }),
         supabase.from("profiles").select("id, first_name, last_name, email").order("first_name"),
+        supabase.from("teams").select("id, name, color").order("name"),
       ]);
 
       if (campaignsRes.error) throw campaignsRes.error;
       if (volunteersRes.error) throw volunteersRes.error;
+      if (teamsRes.error) throw teamsRes.error;
 
       setCampaigns(campaignsRes.data || []);
       setVolunteers(volunteersRes.data || []);
+      setTeams(teamsRes.data || []);
       
-      // Auto-select first ongoing campaign
       const ongoingCampaign = campaignsRes.data?.find(c => c.status === "ongoing");
       if (ongoingCampaign) {
         setSelectedCampaign(ongoingCampaign.id);
@@ -103,6 +121,7 @@ const Assignments = () => {
           segment_id,
           status,
           assigned_to_user_id,
+          assigned_to_team_id,
           segment:segments(
             id,
             number_start,
@@ -111,27 +130,42 @@ const Assignments = () => {
             street:streets(name, type)
           )
         `)
-        .eq("campaign_id", selectedCampaign);
+        .eq("campaign_id", selectedCampaign)
+        .order("status");
 
       if (error) throw error;
 
-      // Fetch assigned users info
-      const segmentsWithUsers = await Promise.all(
+      const segmentsWithAssignees = await Promise.all(
         (data || []).map(async (cs: any) => {
+          const result: CampaignSegment = {
+            ...cs,
+            assignedUser: undefined,
+            assignedTeam: undefined,
+          };
+
           if (cs.assigned_to_user_id) {
             const { data: userData } = await supabase
               .from("profiles")
               .select("first_name, last_name")
               .eq("id", cs.assigned_to_user_id)
               .single();
-            
-            return { ...cs, assignedUser: userData };
+            result.assignedUser = userData || undefined;
           }
-          return cs;
+
+          if (cs.assigned_to_team_id) {
+            const { data: teamData } = await supabase
+              .from("teams")
+              .select("name, color")
+              .eq("id", cs.assigned_to_team_id)
+              .single();
+            result.assignedTeam = teamData || undefined;
+          }
+
+          return result;
         })
       );
 
-      setCampaignSegments(segmentsWithUsers);
+      setCampaignSegments(segmentsWithAssignees);
     } catch (error: any) {
       toast.error("Erreur lors du chargement des segments");
     }
@@ -141,14 +175,12 @@ const Assignments = () => {
     if (!selectedCampaign) return;
 
     try {
-      // Get all segments
       const { data: allSegments, error: segmentsError } = await supabase
         .from("segments")
         .select("id");
 
       if (segmentsError) throw segmentsError;
 
-      // Get existing campaign segments
       const { data: existingSegments, error: existingError } = await supabase
         .from("campaign_segments")
         .select("segment_id")
@@ -184,23 +216,29 @@ const Assignments = () => {
   };
 
   const handleAssign = async () => {
-    if (!selectedSegment || !selectedVolunteer) return;
+    if (!selectedSegment) return;
+    if (assignType === "user" && !selectedVolunteer) return;
+    if (assignType === "team" && !selectedTeam) return;
 
     try {
+      const updateData = {
+        assigned_to_user_id: assignType === "user" ? selectedVolunteer : null,
+        assigned_to_team_id: assignType === "team" ? selectedTeam : null,
+        status: "todo" as "todo" | "in_progress" | "done" | "redo",
+      };
+
       const { error } = await supabase
         .from("campaign_segments")
-        .update({
-          assigned_to_user_id: selectedVolunteer,
-          status: "todo",
-        })
+        .update(updateData)
         .eq("id", selectedSegment.id);
 
       if (error) throw error;
 
-      toast.success("Segment assigné avec succès");
+      toast.success(`Segment assigné à ${assignType === "user" ? "l'utilisateur" : "l'équipe"}`);
       setAssignDialogOpen(false);
       setSelectedSegment(null);
       setSelectedVolunteer("");
+      setSelectedTeam("");
       fetchCampaignSegments();
     } catch (error: any) {
       toast.error("Erreur lors de l'assignation");
@@ -215,7 +253,8 @@ const Assignments = () => {
         .from("campaign_segments")
         .update({
           assigned_to_user_id: null,
-          status: "todo",
+          assigned_to_team_id: null,
+          status: "todo" as "todo" | "in_progress" | "done" | "redo",
         })
         .eq("id", campaignSegmentId);
 
@@ -274,15 +313,15 @@ const Assignments = () => {
 
   const filteredSegments = campaignSegments.filter(cs => {
     if (filterStatus === "all") return true;
-    if (filterStatus === "unassigned") return !cs.assigned_to_user_id;
-    if (filterStatus === "assigned") return !!cs.assigned_to_user_id;
+    if (filterStatus === "unassigned") return !cs.assigned_to_user_id && !cs.assigned_to_team_id;
+    if (filterStatus === "assigned") return !!cs.assigned_to_user_id || !!cs.assigned_to_team_id;
     return cs.status === filterStatus;
   });
 
   const stats = {
     total: campaignSegments.length,
-    assigned: campaignSegments.filter(cs => cs.assigned_to_user_id).length,
-    unassigned: campaignSegments.filter(cs => !cs.assigned_to_user_id).length,
+    assigned: campaignSegments.filter(cs => cs.assigned_to_user_id || cs.assigned_to_team_id).length,
+    unassigned: campaignSegments.filter(cs => !cs.assigned_to_user_id && !cs.assigned_to_team_id).length,
     done: campaignSegments.filter(cs => cs.status === "done").length,
   };
 
@@ -300,7 +339,7 @@ const Assignments = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Assignation des segments</h1>
           <p className="text-muted-foreground">
-            Assignez les segments aux bénévoles pour votre campagne
+            Assignez les segments aux bénévoles ou aux équipes
           </p>
         </div>
       </div>
@@ -445,11 +484,25 @@ const Assignments = () => {
                   <div className="flex items-center gap-3">
                     {getStatusBadge(cs.status)}
                     
-                    {cs.assigned_to_user_id ? (
+                    {(cs.assigned_to_user_id || cs.assigned_to_team_id) ? (
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {cs.assignedUser?.first_name} {cs.assignedUser?.last_name}
-                        </Badge>
+                        {cs.assignedUser && (
+                          <Badge variant="secondary" className="text-xs">
+                            👤 {cs.assignedUser.first_name} {cs.assignedUser.last_name}
+                          </Badge>
+                        )}
+                        {cs.assignedTeam && (
+                          <Badge 
+                            variant="secondary" 
+                            className="text-xs"
+                            style={{ 
+                              backgroundColor: `${cs.assignedTeam.color}20`,
+                              borderColor: cs.assignedTeam.color
+                            }}
+                          >
+                            👥 {cs.assignedTeam.name}
+                          </Badge>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -491,41 +544,67 @@ const Assignments = () => {
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="volunteer">Sélectionnez un bénévole</Label>
-              <Select value={selectedVolunteer} onValueChange={setSelectedVolunteer}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choisir un bénévole" />
-                </SelectTrigger>
-                <SelectContent>
-                  {volunteers.map((volunteer) => (
-                    <SelectItem key={volunteer.id} value={volunteer.id}>
-                      {volunteer.first_name} {volunteer.last_name} ({volunteer.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
-                Annuler
-              </Button>
-              <Button onClick={handleAssign} disabled={!selectedVolunteer}>
-                Assigner
-              </Button>
-            </div>
+          <Tabs value={assignType} onValueChange={(v) => setAssignType(v as "user" | "team")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="user">Utilisateur</TabsTrigger>
+              <TabsTrigger value="team">Équipe</TabsTrigger>
+            </TabsList>
+            <TabsContent value="user" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="volunteer">Sélectionnez un bénévole</Label>
+                <Select value={selectedVolunteer} onValueChange={setSelectedVolunteer}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir un bénévole" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {volunteers.map((volunteer) => (
+                      <SelectItem key={volunteer.id} value={volunteer.id}>
+                        {volunteer.first_name} {volunteer.last_name} ({volunteer.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+            <TabsContent value="team" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="team">Sélectionnez une équipe</Label>
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choisir une équipe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: team.color }}
+                          />
+                          {team.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+          </Tabs>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleAssign} 
+              disabled={assignType === "user" ? !selectedVolunteer : !selectedTeam}
+            >
+              Assigner
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 };
-
-const Label = ({ children, className, ...props }: any) => (
-  <label className={className} {...props}>
-    {children}
-  </label>
-);
 
 export default Assignments;

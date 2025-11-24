@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  UserPlus
+  UserPlus,
+  Download
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -60,10 +61,13 @@ const Layout = ({ children }: LayoutProps) => {
   const navigation = [
     { name: "Tableau de bord", href: "/", icon: LayoutDashboard },
     { name: "Ma campagne", href: "/volunteer", icon: ClipboardList },
+    { name: "Carte", href: "/map", icon: Map },
     ...(isAdmin ? [
-      { name: "Rues & Segments", href: "/streets", icon: Map },
+      { name: "Import rues", href: "/import-streets", icon: Download },
+      { name: "Rues & Segments", href: "/streets", icon: MapPin },
       { name: "Campagnes", href: "/campaigns", icon: ClipboardList },
       { name: "Assignations", href: "/assignments", icon: UserPlus },
+      { name: "Équipes", href: "/teams", icon: Users },
       { name: "Utilisateurs", href: "/users", icon: Users },
     ] : []),
   ];
