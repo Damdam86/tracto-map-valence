@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Polyline } from "react-leaflet";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,12 +38,14 @@ const STATUS_COLORS = {
   mixed: "#8b5cf6", // Violet pour rues avec plusieurs statuts
 };
 
-
 const MapView = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [streets, setStreets] = useState<StreetWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const polylinesRef = useRef<L.Polyline[]>([]);
   
   // Coordonnées de Portes-lès-Valence
   const center: [number, number] = [44.8771, 4.8772];
@@ -58,6 +59,57 @@ const MapView = () => {
       fetchStreetStatuses();
     }
   }, [selectedCampaign]);
+
+  useEffect(() => {
+    // Initialize map
+    if (mapContainerRef.current && !mapRef.current) {
+      mapRef.current = L.map(mapContainerRef.current).setView(center, 14);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(mapRef.current);
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Update polylines when streets change
+    if (mapRef.current && streets.length > 0) {
+      // Remove old polylines
+      polylinesRef.current.forEach(polyline => {
+        mapRef.current?.removeLayer(polyline);
+      });
+      polylinesRef.current = [];
+
+      // Add new polylines
+      streets.forEach((street) => {
+        const offset = Math.random() * 0.01;
+        const line: [number, number][] = [
+          [center[0] + offset, center[1] + offset],
+          [center[0] + offset + 0.002, center[1] + offset + 0.002],
+        ];
+        
+        const polyline = L.polyline(line, {
+          color: getStreetColor(street),
+          weight: 4,
+          opacity: 0.8,
+        }).addTo(mapRef.current!);
+
+        polyline.bindTooltip(
+          `<strong>${street.name}</strong><br/>${getStreetStatus(street)} - ${street.segments.length} segment(s)`,
+          { direction: 'top' }
+        );
+
+        polylinesRef.current.push(polyline);
+      });
+    }
+  }, [streets]);
 
   const fetchCampaigns = async () => {
     try {
@@ -295,38 +347,10 @@ const MapView = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="w-full h-[600px] rounded-lg overflow-hidden border">
-            <MapContainer
-              center={center}
-              zoom={14}
-              style={{ height: "100%", width: "100%" }}
-              scrollWheelZoom={true}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {streets.map((street) => {
-                const offset = Math.random() * 0.01;
-                const line: [number, number][] = [
-                  [center[0] + offset, center[1] + offset],
-                  [center[0] + offset + 0.002, center[1] + offset + 0.002],
-                ];
-                
-                return (
-                  <Polyline
-                    key={street.id}
-                    positions={line}
-                    pathOptions={{
-                      color: getStreetColor(street),
-                      weight: 4,
-                      opacity: 0.8,
-                    }}
-                  />
-                );
-              })}
-            </MapContainer>
-          </div>
+          <div 
+            ref={mapContainerRef}
+            className="w-full h-[600px] rounded-lg overflow-hidden border"
+          />
           <p className="text-sm text-muted-foreground mt-4">
             Note: Cette carte affiche des tracés simplifiés. Pour obtenir les coordonnées réelles des rues, 
             utilisez la fonction d'import depuis OpenStreetMap dans la page Rues & Segments.
