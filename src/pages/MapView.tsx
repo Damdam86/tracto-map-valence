@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Polyline, Popup } from "react-leaflet";
+import { MapContainer, TileLayer } from "react-leaflet";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import StreetPolyline from "@/components/StreetPolyline";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -315,27 +315,13 @@ const MapView = () => {
                 ];
                 
                 return (
-                  <Polyline
+                  <StreetPolyline
                     key={street.id}
+                    street={street}
                     positions={line}
-                    pathOptions={{
-                      color: getStreetColor(street),
-                      weight: 4,
-                      opacity: 0.8,
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-2">
-                        <p className="font-semibold">{street.name}</p>
-                        <Badge variant="outline" className="mt-1">
-                          {getStreetStatus(street)}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {street.segments.length} segment(s)
-                        </p>
-                      </div>
-                    </Popup>
-                  </Polyline>
+                    color={getStreetColor(street)}
+                    status={getStreetStatus(street)}
+                  />
                 );
               })}
             </MapContainer>
