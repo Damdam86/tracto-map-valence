@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Polyline, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Popup } from "react-leaflet";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,15 +40,6 @@ const STATUS_COLORS = {
   mixed: "#8b5cf6", // Violet pour rues avec plusieurs statuts
 };
 
-const MapUpdater = ({ center }: { center: [number, number] }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    map.setView(center, 14);
-  }, [center, map]);
-  
-  return null;
-};
 
 const MapView = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -316,7 +307,6 @@ const MapView = () => {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <MapUpdater center={center} />
               {streets.map((street) => {
                 const offset = Math.random() * 0.01;
                 const line: [number, number][] = [
