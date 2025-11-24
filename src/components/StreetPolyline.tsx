@@ -1,4 +1,4 @@
-import { Polyline, Popup } from "react-leaflet";
+import { Polyline, Tooltip } from "react-leaflet";
 
 interface StreetPolylineProps {
   street: {
@@ -21,24 +21,13 @@ const StreetPolyline = ({ street, positions, color, status }: StreetPolylineProp
         opacity: 0.8,
       }}
     >
-      <Popup>
-        <div style={{ padding: "8px" }}>
-          <p style={{ fontWeight: 600, marginBottom: "4px" }}>{street.name}</p>
-          <p style={{ 
-            fontSize: "12px", 
-            padding: "2px 8px",
-            border: "1px solid #e5e7eb",
-            borderRadius: "4px",
-            display: "inline-block",
-            marginTop: "4px"
-          }}>
-            {status}
-          </p>
-          <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px" }}>
-            {street.segments.length} segment(s)
-          </p>
+      <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+        <div>
+          <strong>{street.name}</strong>
+          <br />
+          {status} - {street.segments.length} segment(s)
         </div>
-      </Popup>
+      </Tooltip>
     </Polyline>
   );
 };
