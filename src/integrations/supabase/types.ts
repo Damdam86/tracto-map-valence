@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       campaign_segments: {
         Row: {
+          assigned_to_team_id: string | null
           assigned_to_user_id: string | null
           campaign_id: string
           created_at: string
@@ -26,6 +27,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_to_team_id?: string | null
           assigned_to_user_id?: string | null
           campaign_id: string
           created_at?: string
@@ -36,6 +38,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_to_team_id?: string | null
           assigned_to_user_id?: string | null
           campaign_id?: string
           created_at?: string
@@ -46,6 +49,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "campaign_segments_assigned_to_team_id_fkey"
+            columns: ["assigned_to_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "campaign_segments_campaign_id_fkey"
             columns: ["campaign_id"]
@@ -198,6 +208,65 @@ export type Database = {
           name?: string
           neighborhood?: string | null
           type?: Database["public"]["Enums"]["street_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          id: string
+          joined_at: string
+          role: string | null
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          role?: string | null
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          role?: string | null
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
           updated_at?: string
         }
         Relationships: []
