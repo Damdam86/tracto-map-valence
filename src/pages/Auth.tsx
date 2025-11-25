@@ -64,7 +64,6 @@ const Auth = () => {
     setIsSendingCode(true);
 
     try {
-      // Try to sign in first
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         token: code,
@@ -72,31 +71,14 @@ const Auth = () => {
       });
 
       if (signInError) {
-        // If sign in fails, try to create account
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: email.toLowerCase().trim(),
-          password: FIXED_CODE,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-
-        if (signUpError?.message?.includes("already registered")) {
-          toast.error(
-            "Votre compte existe déjà avec un autre mot de passe. Demandez au coordinateur de le réinitialiser.",
-            { duration: 6000 }
-          );
-          setLoading(false);
-          return;
-        }
-
-        if (signUpError) throw signUpError;
-
-        toast.success("Compte créé avec succès !");
-      } else {
-        toast.success("Connexion réussie !");
+        toast.error(
+          "Impossible de vous connecter avec ce code. Vérifiez l'email saisi ou contactez votre coordinateur pour activer votre compte.",
+          { duration: 6000 }
+        );
+        return;
       }
 
+      toast.success("Connexion réussie !");
       navigate("/");
     } catch (error: unknown) {
       toast.error(
