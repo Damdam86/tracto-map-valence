@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Download, MapPin, AlertCircle } from "lucide-react";
+import { Download, MapPin, AlertCircle, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface OverpassStreet {
@@ -17,9 +17,11 @@ interface OverpassStreet {
 
 const ImportStreets = () => {
   const [loading, setLoading] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [imported, setImported] = useState(0);
   const [skipped, setSkipped] = useState(0);
+  const [updated, setUpdated] = useState(0);
 
   const getStreetType = (highway: string): "street" | "avenue" | "impasse" | "boulevard" | "place" | "chemin" | "route" => {
     const mapping: Record<string, any> = {
@@ -259,6 +261,76 @@ const ImportStreets = () => {
     }
   };
 
+  const handleUpdateCoordinates = async () => {
+    setUpdating(true);
+    setProgress(0);
+    setUpdated(0);
+
+    try {
+      // Fetch all streets from database
+      const { data: existingStreets, error: fetchError } = await supabase
+        .from("streets")
+        .select("id, name, type");
+
+      if (fetchError) throw fetchError;
+
+      if (!existingStreets || existingStreets.length === 0) {
+        toast.error("Aucune rue trouvée dans la base de données");
+        setUpdating(false);
+        return;
+      }
+
+      toast.info(`Mise à jour des coordonnées pour ${existingStreets.length} rues...`);
+
+      // Fetch streets from OpenStreetMap
+      const elements = await fetchStreetsFromOverpass();
+      const streets = elements.filter(
+        (el: any) => el.type === "way" && el.tags?.highway && el.tags?.name
+      ) as OverpassStreet[];
+
+      let updatedCount = 0;
+
+      for (let i = 0; i < existingStreets.length; i++) {
+        const dbStreet = existingStreets[i];
+        
+        // Find matching street in OSM data
+        const osmStreet = streets.find(
+          (s: OverpassStreet) => s.tags.name === dbStreet.name
+        );
+
+        if (osmStreet) {
+          const coordinates = extractCoordinates(osmStreet, elements);
+          
+          if (coordinates.length > 0) {
+            // Update coordinates
+            const { error } = await supabase
+              .from("streets")
+              .update({ coordinates })
+              .eq("id", dbStreet.id);
+
+            if (!error) {
+              updatedCount++;
+            }
+          }
+        }
+
+        setUpdated(updatedCount);
+        setProgress(((i + 1) / existingStreets.length) * 100);
+
+        if (i % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
+      toast.success(`${updatedCount} rue(s) mise(s) à jour avec les coordonnées GPS !`);
+    } catch (error: any) {
+      console.error("Update error:", error);
+      toast.error("Erreur lors de la mise à jour: " + error.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -312,13 +384,13 @@ const ImportStreets = () => {
 
           <Button
             onClick={handleImport}
-            disabled={loading}
+            disabled={loading || updating}
             className="w-full"
             size="lg"
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Import en cours...
               </>
             ) : (
@@ -328,6 +400,65 @@ const ImportStreets = () => {
               </>
             )}
           </Button>
+
+          {(imported > 0 || skipped > 0) && !loading && (
+            <div className="mt-4 p-4 bg-muted rounded-lg">
+              <p className="text-sm">
+                <strong>{imported}</strong> rue(s) importée(s)
+                <br />
+                <strong>{skipped}</strong> rue(s) ignorée(s) (déjà existantes)
+              </p>
+            </div>
+          )}
+
+          <div className="mt-6 pt-6 border-t">
+            <h3 className="font-semibold mb-2">Mettre à jour les coordonnées GPS</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Si vous avez déjà importé les rues mais qu'elles n'ont pas de coordonnées GPS,
+              utilisez ce bouton pour les mettre à jour sans réimporter toutes les rues.
+            </p>
+            
+            {updating && (
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Progression</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <Progress value={progress} />
+                <div className="text-sm text-muted-foreground">
+                  Mises à jour: {updated}
+                </div>
+              </div>
+            )}
+            
+            <Button 
+              onClick={handleUpdateCoordinates} 
+              disabled={loading || updating}
+              variant="outline"
+              className="w-full"
+              size="lg"
+            >
+              {updating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Mise à jour en cours...
+                </>
+              ) : (
+                <>
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Mettre à jour les coordonnées GPS
+                </>
+              )}
+            </Button>
+
+            {updated > 0 && !updating && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <p className="text-sm">
+                  <strong>{updated}</strong> rue(s) mise(s) à jour
+                </p>
+              </div>
+            )}
+          </div>
 
           <p className="text-xs text-muted-foreground">
             Source de données: © OpenStreetMap contributors, disponible sous la licence Open Database License (ODbL)
