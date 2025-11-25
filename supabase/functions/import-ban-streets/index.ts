@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
       imported: 0,
       updated: 0,
       skipped: 0,
+      osmAdded: 0,
       total: streetMap.size
     }
     
@@ -197,7 +198,95 @@ Deno.serve(async (req) => {
       }
     }
     
-    console.log('Import results:', results)
+    console.log('BAN import results:', results)
+    
+    // Now fetch streets from OpenStreetMap to complement BAN data
+    console.log('Fetching complementary streets from OpenStreetMap...')
+    
+    const overpassQuery = `
+      [out:json][timeout:60];
+      area["ISO3166-2"="FR-26"]["name"="Drôme"]->.a;
+      (
+        way["highway"]["name"]["addr:city"="Portes-lès-Valence"](area.a);
+        way["highway"]["name"]["addr:postcode"="26800"](area.a);
+      );
+      out center;
+    `
+    
+    const overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(overpassQuery)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+    
+    if (!overpassResponse.ok) {
+      console.error('Overpass API error:', overpassResponse.statusText)
+    } else {
+      const osmData = await overpassResponse.json()
+      console.log(`Found ${osmData.elements?.length || 0} streets in OpenStreetMap`)
+      
+      // Get current street names (after BAN import)
+      const { data: currentStreets } = await supabase
+        .from('streets')
+        .select('name')
+      
+      const currentNames = new Set(currentStreets?.map(s => s.name) || [])
+      
+      let osmAdded = 0
+      
+      for (const element of osmData.elements || []) {
+        const streetName = element.tags?.name
+        if (!streetName || currentNames.has(streetName)) continue
+        
+        const lat = element.center?.lat || element.lat
+        const lon = element.center?.lon || element.lon
+        
+        if (!lat || !lon) continue
+        
+        // Determine street type from name
+        const getStreetType = (name: string) => {
+          const lower = name.toLowerCase()
+          if (lower.includes('avenue') || lower.startsWith('av ')) return 'avenue'
+          if (lower.includes('boulevard') || lower.startsWith('bd ')) return 'boulevard'
+          if (lower.includes('impasse') || lower.startsWith('imp ')) return 'impasse'
+          if (lower.includes('place') || lower.startsWith('pl ')) return 'place'
+          if (lower.includes('chemin') || lower.startsWith('ch ')) return 'chemin'
+          if (lower.includes('route') || lower.startsWith('rte ')) return 'route'
+          return 'street'
+        }
+        
+        const { data: newStreet, error } = await supabase
+          .from('streets')
+          .insert({
+            name: streetName,
+            type: getStreetType(streetName),
+            district: 'Importé',
+            neighborhood: 'OpenStreetMap',
+            coordinates: [[lat, lon]]
+          })
+          .select()
+          .single()
+        
+        if (!error && newStreet) {
+          osmAdded++
+          currentNames.add(streetName)
+          
+          // Create a default segment
+          await supabase.from('segments').insert({
+            street_id: newStreet.id,
+            number_start: 1,
+            number_end: 100,
+            side: 'both',
+            building_type: 'mixed'
+          })
+        }
+      }
+      
+      results.osmAdded = osmAdded
+      console.log(`Added ${osmAdded} streets from OpenStreetMap`)
+    }
+    
+    console.log('Final import results:', results)
     
     return new Response(
       JSON.stringify(results),

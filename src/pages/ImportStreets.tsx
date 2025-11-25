@@ -41,8 +41,9 @@ const ImportStreets = () => {
       setSkipped(data.skipped || 0);
       setProgress(100);
       
+      const osmAddedText = data.osmAdded ? `, ${data.osmAdded} complétée(s) depuis OSM` : '';
       toast.success(
-        `Import terminé ! ${data.imported} rue(s) importée(s), ${data.updated} mise(s) à jour, ${data.skipped} ignorée(s)`
+        `Import terminé ! ${data.imported} rue(s) BAN importée(s), ${data.updated} mise(s) à jour${osmAddedText}, ${data.skipped} ignorée(s)`
       );
 
     } catch (error: any) {
