@@ -16,6 +16,18 @@ const isInBounds = (lat: number, lon: number) => {
   return lat >= BBOX.minLat && lat <= BBOX.maxLat && lon >= BBOX.minLon && lon <= BBOX.maxLon;
 };
 
+const BBOX = {
+  minLat: 44.865,
+  maxLat: 44.885,
+  minLon: 4.865,
+  maxLon: 4.895
+}
+
+const isInBounds = (lat: number, lon: number) => {
+  return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
+         lon >= BBOX.minLon && lon <= BBOX.maxLon
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -74,24 +86,24 @@ Deno.serve(async (req) => {
     const streetMap = new Map<string, { lats: number[]; lons: number[]; numbers: number[] }>();
 
     for (let i = 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.trim()) continue;
-
-      const cols = line.split(";"); // BAN CSV uses semicolon separator
-      const codeInsee = cols[codeInseeIdx];
-
-      if (codeInsee === "26252") {
-        const nomVoie = cols[nomVoieIdx];
-        const lat = parseFloat(cols[latIdx]);
-        const lon = parseFloat(cols[lonIdx]);
+      const line = lines[i]
+      if (!line.trim()) continue
+      
+      const cols = line.split(';') // BAN CSV uses semicolon separator
+      const codeInsee = cols[codeInseeIdx]
+      
+      if (codeInsee === '26252') {
+        const nomVoie = cols[nomVoieIdx]
+        const lat = parseFloat(cols[latIdx])
+        const lon = parseFloat(cols[lonIdx])
 
         if (nomVoie && !isNaN(lat) && !isNaN(lon) && isInBounds(lat, lon)) {
           if (!streetMap.has(nomVoie)) {
             streetMap.set(nomVoie, { lats: [], lons: [], numbers: [] });
           }
-          const street = streetMap.get(nomVoie)!;
-          street.lats.push(lat);
-          street.lons.push(lon);
+          const street = streetMap.get(nomVoie)!
+          street.lats.push(lat)
+          street.lons.push(lon)
 
           // Extract house number if present
           const numeroCol = headers.indexOf("numero");
@@ -127,11 +139,11 @@ Deno.serve(async (req) => {
 
     // Process each street
     for (const [streetName, data] of streetMap.entries()) {
-      const { lats, lons, numbers } = data;
+      const { lats, lons, numbers } = data
 
       if (lats.length === 0 || lons.length === 0) {
-        results.skipped++;
-        continue;
+        results.skipped++
+        continue
       }
 
       // Calculate centroid (average position of all addresses)
@@ -255,12 +267,12 @@ Deno.serve(async (req) => {
           coordinates = [[element.center.lat, element.center.lon]];
         }
 
-        const filteredCoordinates = coordinates.filter((coord) => isInBounds(coord[0], coord[1]));
+        const filteredCoordinates = coordinates.filter((coord) => isInBounds(coord[0], coord[1]))
 
-        if (filteredCoordinates.length === 0) continue;
+        if (filteredCoordinates.length === 0) continue
 
-        coordinates = filteredCoordinates;
-
+        coordinates = filteredCoordinates
+        
         // If street exists, update it with full geometry
         if (currentNames.has(streetName)) {
           const { data: existingStreet } = await supabase

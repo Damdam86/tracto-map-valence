@@ -11,6 +11,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import logo from "@/assets/logo.png";
 import { useTextSize } from "@/hooks/useTextSize";
 
+const FIXED_CODE = "123456"; // Code fixe pour tous les utilisateurs
+
 const Auth = () => {
   const navigate = useNavigate();
   const { textSize, toggleTextSize, textSizeClass } = useTextSize();
@@ -40,18 +42,13 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    if (!resendTimer) return;
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    const timer = setInterval(() => {
-      setResendTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (code.length !== 6) {
+      toast.error("Le code doit contenir 6 chiffres");
+      return;
+    }
 
     return () => clearInterval(timer);
   }, [resendTimer]);
@@ -123,11 +120,16 @@ const Auth = () => {
 
       if (error) throw error;
 
-      toast.success("Connexion réussie !");
+        if (signUpError) throw signUpError;
+
+        toast.success("Compte créé avec succès !");
+      } else {
+        toast.success("Connexion réussie !");
+      }
+
       navigate("/");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Code invalide. Réessayez ou renvoyez le code.";
-      toast.error(message);
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la connexion");
     } finally {
       setLoading(false);
     }
@@ -142,7 +144,7 @@ const Auth = () => {
           </div>
           <CardTitle className="text-3xl font-extrabold">Tractage Portes-lès-Valence</CardTitle>
           <CardDescription className="text-lg font-medium text-foreground">
-            Connexion sécurisée par code
+            Connexion instantanée avec le code communiqué
           </CardDescription>
           <div className="flex justify-center">
             <Button variant="outline" size="sm" onClick={toggleTextSize} className="text-base font-semibold">
@@ -221,10 +223,10 @@ const Auth = () => {
 
             <div className="bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 space-y-3">
               <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">
-                🔐 Connexion sécurisée
+                🔐 Connexion simplifiée
               </p>
               <p className="text-base text-blue-700 dark:text-blue-300">
-                Entrez votre email, recevez un code instantané puis saisissez-le ici. Si vous ne recevez rien après 1 minute, renvoyez le code ou contactez votre coordinateur.
+                Entrez l'email autorisé par votre coordinateur puis le code fixe communiqué à l'équipe.
               </p>
               <a
                 href="mailto:coordinateur@campagne.fr"
@@ -235,7 +237,7 @@ const Auth = () => {
             </div>
 
             <Button type="submit" className="w-full h-14 text-lg font-bold" disabled={loading || code.length !== 6}>
-              {loading ? "Connexion..." : "Valider le code"}
+              {loading ? "Connexion..." : "Se connecter"}
             </Button>
 
             <p className="text-base text-center text-muted-foreground">
