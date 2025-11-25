@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { RefreshCw } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -303,20 +305,30 @@ const MapView = () => {
             Visualisez la progression du tractage en temps réel
           </p>
         </div>
-        <div className="w-full md:w-64">
-          <Label>Campagne</Label>
-          <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sélectionnez une campagne" />
-            </SelectTrigger>
-            <SelectContent>
-              {campaigns.map((campaign) => (
-                <SelectItem key={campaign.id} value={campaign.id}>
-                  {campaign.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex gap-3 items-end">
+          <div className="w-full md:w-64">
+            <Label>Campagne</Label>
+            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionnez une campagne" />
+              </SelectTrigger>
+              <SelectContent>
+                {campaigns.map((campaign) => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => fetchStreetStatuses()}
+            variant="outline"
+            size="icon"
+            title="Actualiser la carte"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
