@@ -63,6 +63,8 @@ const Layout = ({ children }: LayoutProps) => {
     { name: "Ma campagne", href: "/volunteer", icon: ClipboardList },
     { name: "Carte", href: "/map", icon: Map },
     ...(isAdmin ? [
+      { name: "Invitations", href: "/invitations", icon: UserPlus },
+      { name: "Quartiers", href: "/districts", icon: MapPin },
       { name: "Import rues", href: "/import-streets", icon: Download },
       { name: "Rues & Segments", href: "/streets", icon: MapPin },
       { name: "Campagnes", href: "/campaigns", icon: ClipboardList },

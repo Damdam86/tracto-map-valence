@@ -15,6 +15,8 @@ import Teams from "./pages/Teams";
 import MapView from "./pages/MapView";
 import ImportStreets from "./pages/ImportStreets";
 import Users from "./pages/Users";
+import Invitations from "./pages/Invitations";
+import Districts from "./pages/Districts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +39,8 @@ const App = () => (
           <Route path="/map" element={<Layout><MapView /></Layout>} />
           <Route path="/import-streets" element={<Layout><ImportStreets /></Layout>} />
           <Route path="/users" element={<Layout><Users /></Layout>} />
+          <Route path="/invitations" element={<Layout><Invitations /></Layout>} />
+          <Route path="/districts" element={<Layout><Districts /></Layout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
