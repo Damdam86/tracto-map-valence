@@ -1,10 +1,11 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useTextSize } from "@/hooks/useTextSize";
 import { Button } from "@/components/ui/button";
-import { 
-  MapPin, 
-  LayoutDashboard, 
+import {
+  MapPin,
+  LayoutDashboard,
   Map, 
   Users, 
   ClipboardList, 
@@ -22,6 +23,7 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const { user, loading, signOut } = useAuth();
+  const { textSize, toggleTextSize, textSizeClass } = useTextSize();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -58,21 +60,28 @@ const Layout = ({ children }: LayoutProps) => {
 
   const isAdmin = userRole === "admin" || userRole === "coordinator";
 
-  const navigation = [
-    { name: "Tableau de bord", href: "/", icon: LayoutDashboard },
+  const primaryNavigation = [
     { name: "Ma campagne", href: "/volunteer", icon: ClipboardList },
     { name: "Carte", href: "/map", icon: Map },
-    ...(isAdmin ? [
-      { name: "Invitations", href: "/invitations", icon: UserPlus },
-      { name: "Quartiers", href: "/districts", icon: MapPin },
-      { name: "Import rues", href: "/import-streets", icon: Download },
-      { name: "Rues & Segments", href: "/streets", icon: MapPin },
-      { name: "Campagnes", href: "/campaigns", icon: ClipboardList },
-      { name: "Assignations", href: "/assignments", icon: UserPlus },
-      { name: "Équipes", href: "/teams", icon: Users },
-      { name: "Utilisateurs", href: "/users", icon: Users },
-    ] : []),
   ];
+
+  const adminNavigation = [
+    { name: "Tableau de bord", href: "/", icon: LayoutDashboard },
+    { name: "Invitations", href: "/invitations", icon: UserPlus },
+    { name: "Quartiers", href: "/districts", icon: MapPin },
+    { name: "Import rues", href: "/import-streets", icon: Download },
+    { name: "Rues & Segments", href: "/streets", icon: MapPin },
+    { name: "Campagnes", href: "/campaigns", icon: ClipboardList },
+    { name: "Assignations", href: "/assignments", icon: UserPlus },
+    { name: "Équipes", href: "/teams", icon: Users },
+    { name: "Utilisateurs", href: "/users", icon: Users },
+  ];
+
+  const navigation = isAdmin
+    ? [...primaryNavigation, ...adminNavigation]
+    : [...primaryNavigation, { name: "Tableau de bord", href: "/", icon: LayoutDashboard }];
+
+  const shouldShowReturnToCampaign = !isAdmin && location.pathname !== "/volunteer";
 
   if (loading) {
     return (
@@ -87,7 +96,7 @@ const Layout = ({ children }: LayoutProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={`min-h-screen bg-background ${textSizeClass}`}>
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container flex h-16 items-center justify-between px-4">
@@ -96,8 +105,8 @@ const Layout = ({ children }: LayoutProps) => {
               <MapPin className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-lg font-bold">Tractage PLV</h1>
-              <p className="text-xs text-muted-foreground">Portes-lès-Valence</p>
+              <h1 className="text-xl font-extrabold">Tractage PLV</h1>
+              <p className="text-sm text-muted-foreground">Portes-lès-Valence</p>
             </div>
           </div>
 
@@ -110,8 +119,8 @@ const Layout = ({ children }: LayoutProps) => {
                 <Link key={item.name} to={item.href}>
                   <Button
                     variant={isActive ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
+                    size="lg"
+                    className="gap-2 text-base font-semibold"
                   >
                     <Icon className="w-4 h-4" />
                     {item.name}
@@ -122,6 +131,14 @@ const Layout = ({ children }: LayoutProps) => {
           </nav>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleTextSize}
+              className="hidden md:flex text-base font-semibold"
+            >
+              {textSize === "large" ? "Texte normal" : "Agrandir le texte"}
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -161,7 +178,7 @@ const Layout = ({ children }: LayoutProps) => {
                   >
                     <Button
                       variant={isActive ? "default" : "ghost"}
-                      className="w-full justify-start gap-2"
+                      className="w-full justify-start gap-2 text-base font-semibold"
                     >
                       <Icon className="w-4 h-4" />
                       {item.name}
@@ -169,6 +186,13 @@ const Layout = ({ children }: LayoutProps) => {
                   </Link>
                 );
               })}
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2 text-base font-semibold"
+                onClick={toggleTextSize}
+              >
+                {textSize === "large" ? "Texte normal" : "Agrandir le texte"}
+              </Button>
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-2"
@@ -183,7 +207,16 @@ const Layout = ({ children }: LayoutProps) => {
       </header>
 
       {/* Main Content */}
-      <main className="container py-6 px-4">
+      <main className="container py-6 px-4 space-y-4">
+        {shouldShowReturnToCampaign && (
+          <div className="flex justify-start">
+            <Link to="/volunteer">
+              <Button variant="secondary" size="lg" className="text-base font-semibold">
+                ← Retour à ma campagne
+              </Button>
+            </Link>
+          </div>
+        )}
         {children}
       </main>
     </div>
