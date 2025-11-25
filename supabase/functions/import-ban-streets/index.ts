@@ -5,6 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const BBOX = {
+  minLat: 44.865,
+  maxLat: 44.885,
+  minLon: 4.865,
+  maxLon: 4.895
+}
+
+const isInBounds = (lat: number, lon: number) => {
+  return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
+         lon >= BBOX.minLon && lon <= BBOX.maxLon
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -73,15 +85,15 @@ Deno.serve(async (req) => {
         const nomVoie = cols[nomVoieIdx]
         const lat = parseFloat(cols[latIdx])
         const lon = parseFloat(cols[lonIdx])
-        
-        if (nomVoie && !isNaN(lat) && !isNaN(lon)) {
+
+        if (nomVoie && !isNaN(lat) && !isNaN(lon) && isInBounds(lat, lon)) {
           if (!streetMap.has(nomVoie)) {
             streetMap.set(nomVoie, { lats: [], lons: [], numbers: [] })
           }
           const street = streetMap.get(nomVoie)!
           street.lats.push(lat)
           street.lons.push(lon)
-          
+
           // Extract house number if present
           const numeroCol = headers.indexOf('numero')
           if (numeroCol >= 0 && cols[numeroCol]) {
@@ -119,7 +131,12 @@ Deno.serve(async (req) => {
     // Process each street
     for (const [streetName, data] of streetMap.entries()) {
       const { lats, lons, numbers } = data
-      
+
+      if (lats.length === 0 || lons.length === 0) {
+        results.skipped++
+        continue
+      }
+
       // Calculate centroid (average position of all addresses)
       const centroidLat = lats.reduce((sum, lat) => sum + lat, 0) / lats.length
       const centroidLon = lons.reduce((sum, lon) => sum + lon, 0) / lons.length
@@ -245,8 +262,12 @@ Deno.serve(async (req) => {
           // Fallback to center if geometry not available
           coordinates = [[element.center.lat, element.center.lon]]
         }
-        
-        if (coordinates.length === 0) continue
+
+        const filteredCoordinates = coordinates.filter((coord) => isInBounds(coord[0], coord[1]))
+
+        if (filteredCoordinates.length === 0) continue
+
+        coordinates = filteredCoordinates
         
         // If street exists, update it with full geometry
         if (currentNames.has(streetName)) {
