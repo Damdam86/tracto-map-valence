@@ -19,6 +19,9 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [isSendingCode, setIsSendingCode] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -47,18 +50,25 @@ const Auth = () => {
       return;
     }
 
-    if (code !== FIXED_CODE) {
-      toast.error("Code incorrect");
+    return () => clearInterval(timer);
+  }, [resendTimer]);
+
+  const sendOtp = async () => {
+    const trimmedEmail = email.toLowerCase().trim();
+
+    if (!trimmedEmail) {
+      toast.error("Merci de renseigner votre email");
       return;
     }
 
-    setLoading(true);
+    setIsSendingCode(true);
 
     try {
       // Try to sign in first
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
-        password: FIXED_CODE,
+        token: code,
+        type: "email",
       });
 
       if (signInError) {
@@ -133,6 +143,20 @@ const Auth = () => {
                   autoFocus
                 />
               </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={sendOtp}
+                  disabled={isSendingCode || resendTimer > 0}
+                  className="h-12 text-lg font-semibold"
+                >
+                  {isSendingCode ? "Envoi..." : resendTimer > 0 ? `Renvoyer dans ${resendTimer}s` : "Envoyer le code"}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Un email avec un code à 6 chiffres est envoyé immédiatement.
+                </p>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -155,6 +179,19 @@ const Auth = () => {
                     <InputOTPSlot index={5} />
                   </InputOTPGroup>
                 </InputOTP>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <p className="text-muted-foreground">Pas reçu ? Vérifiez vos spams.</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isSendingCode || resendTimer > 0}
+                  onClick={sendOtp}
+                  className="text-base font-semibold"
+                >
+                  Renvoyer le code
+                </Button>
               </div>
             </div>
 
