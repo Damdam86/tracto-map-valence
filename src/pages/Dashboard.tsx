@@ -68,48 +68,48 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-lg md:text-xl">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
-        <p className="text-muted-foreground">
+        <p className="text-base md:text-lg text-muted-foreground font-semibold">
           Vue d'ensemble de vos campagnes de tractage
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-base md:text-lg font-semibold">
               Campagnes actives
             </CardTitle>
             <Target className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeCampaigns}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-semibold">
               Sur {stats.totalCampaigns} au total
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-base md:text-lg font-semibold">
               Segments
             </CardTitle>
             <MapPin className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalSegments}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-semibold">
               Segments de rues assignés
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-base md:text-lg font-semibold">
               Avancement
             </CardTitle>
             <CheckCircle2 className="h-4 w-4 text-success-green" />
@@ -120,16 +120,16 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-base md:text-lg font-semibold">
               Bénévoles
             </CardTitle>
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalVolunteers}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-semibold">
               Inscrits sur la plateforme
             </p>
           </CardContent>
@@ -137,21 +137,21 @@ const Dashboard = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="border-2">
           <CardHeader>
-            <CardTitle>Campagnes en cours</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl font-bold">Campagnes en cours</CardTitle>
+            <CardDescription className="text-base font-semibold">
               Les campagnes actives nécessitant votre attention
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {stats.activeCampaigns === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-base text-muted-foreground font-semibold">
                   Aucune campagne active pour le moment
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-base text-muted-foreground font-semibold">
                   {stats.activeCampaigns} campagne(s) en cours
                 </p>
               )}
@@ -159,17 +159,17 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2">
           <CardHeader>
-            <CardTitle>Progression globale</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl font-bold">Progression globale</CardTitle>
+            <CardDescription className="text-base font-semibold">
               Avancement de la distribution de tracts
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Segments complétés</span>
+                <span className="text-base font-semibold">Segments complétés</span>
                 <Badge variant="secondary">
                   {stats.completedSegments} / {stats.totalSegments}
                 </Badge>

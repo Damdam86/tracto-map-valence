@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Circle } from "lucide-react";
 
@@ -30,10 +39,16 @@ const VolunteerSimple = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchAssignedSegments();
+      const tutorialSeen = localStorage.getItem("volunteer-simple-tutorial");
+      if (!tutorialSeen) {
+        setShowTutorial(true);
+      }
     }
   }, [user]);
 
@@ -60,8 +75,9 @@ const VolunteerSimple = () => {
 
       if (error) throw error;
       setSegments(data || []);
-    } catch (error: any) {
-      toast.error("Erreur lors du chargement");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur lors du chargement";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -104,8 +120,9 @@ const VolunteerSimple = () => {
       if (newStatus === "done" && currentIndex < segments.length - 1) {
         setCurrentIndex(currentIndex + 1);
       }
-    } catch (error: any) {
-      toast.error("Erreur lors de la mise à jour");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur lors de la mise à jour";
+      toast.error(message);
     } finally {
       setUpdating(false);
     }
@@ -143,6 +160,11 @@ const VolunteerSimple = () => {
     }
   };
 
+  const dismissTutorial = () => {
+    setShowTutorial(false);
+    localStorage.setItem("volunteer-simple-tutorial", "seen");
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -171,14 +193,73 @@ const VolunteerSimple = () => {
   const isTodo = currentSegment.status === "todo";
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        {showTutorial && (
+          <Card className="flex-1 border-2 border-primary/50 bg-primary/5">
+            <CardContent className="space-y-3 p-4">
+              <p className="text-lg font-bold">Bienvenue sur "Ma campagne"</p>
+              <ol className="space-y-2 text-base list-decimal list-inside">
+                <li>Appuyez sur "Je commence" pour démarrer la distribution.</li>
+                <li>Distribuez les tracts sur le tronçon affiché.</li>
+                <li>Validez avec "✓ C'est fait !" pour passer au suivant.</li>
+              </ol>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={dismissTutorial} className="text-base font-semibold">
+                  Compris
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="self-start text-base font-semibold">
+              Besoin d'aide ?
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Questions rapides</DialogTitle>
+              <DialogDescription className="text-base">
+                Réponses en 10 secondes et contact coordinateur.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 text-base">
+              <div>
+                <p className="font-semibold">Comment changer de segment ?</p>
+                <p>Utilisez les flèches ou le bouton "Segment suivant" après validation.</p>
+              </div>
+              <div>
+                <p className="font-semibold">Je n'ai plus de tracts.</p>
+                <p>Contactez le coordinateur pour réassort et laissez le segment en "À faire".</p>
+              </div>
+              <div>
+                <p className="font-semibold">Erreur de rue ou de numéro ?</p>
+                <p>Revenez en arrière et validez seulement après avoir couvert le bon tronçon.</p>
+              </div>
+              <a
+                href="mailto:coordinateur@campagne.fr"
+                className="font-semibold text-primary underline"
+              >
+                Joindre le coordinateur (email)
+              </a>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setHelpOpen(false)} className="text-base font-semibold">Fermer</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
       {/* Progress indicator */}
-      <div className="mb-8 text-center">
+      <div className="mb-2 text-center">
         <p className="text-2xl font-semibold text-muted-foreground">
           Segment {currentIndex + 1} sur {segments.length}
         </p>
         <div className="w-full bg-muted rounded-full h-3 mt-3">
-          <div 
+          <div
             className="bg-primary h-3 rounded-full transition-all duration-300"
             style={{ width: `${((currentIndex + 1) / segments.length) * 100}%` }}
           />
