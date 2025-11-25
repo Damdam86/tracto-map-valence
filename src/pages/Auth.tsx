@@ -71,8 +71,8 @@ const Auth = () => {
         password: FIXED_CODE,
       });
 
-      // If sign in fails, create account
       if (signInError) {
+        // If sign in fails, try to create account
         const { error: signUpError } = await supabase.auth.signUp({
           email: email.toLowerCase().trim(),
           password: FIXED_CODE,
@@ -81,10 +81,23 @@ const Auth = () => {
           },
         });
 
-        if (signUpError) throw signUpError;
-      }
+        // If user already exists but with wrong password, show clear message
+        if (signUpError?.message?.includes("already registered")) {
+          toast.error(
+            "Votre compte existe mais avec un mot de passe différent. Contactez votre coordinateur pour réinitialiser votre accès.",
+            { duration: 6000 }
+          );
+          setLoading(false);
+          return;
+        }
 
-      toast.success("Connexion réussie !");
+        if (signUpError) throw signUpError;
+        
+        toast.success("Compte créé avec succès !");
+      } else {
+        toast.success("Connexion réussie !");
+      }
+      
       navigate("/");
     } catch (error: any) {
       toast.error(error.message || "Erreur lors de la connexion");
