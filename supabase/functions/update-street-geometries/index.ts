@@ -68,9 +68,47 @@ Deno.serve(async (req) => {
 
     // Function to check if a coordinate is within strict bounds
     const isInBounds = (lat: number, lon: number) => {
-      return lat >= BBOX.minLat && lat <= BBOX.maxLat && 
+      return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
              lon >= BBOX.minLon && lon <= BBOX.maxLon;
     };
+
+    const extractPoints = (coordinates: any): number[][] => {
+      if (!Array.isArray(coordinates) || coordinates.length === 0) return [];
+
+      const isPoint = (value: any) =>
+        Array.isArray(value) && value.length >= 2 &&
+        typeof value[0] === 'number' && typeof value[1] === 'number';
+
+      if (isPoint(coordinates[0])) {
+        return coordinates as number[][];
+      }
+
+      return coordinates.flatMap((segment: any) => Array.isArray(segment) ? segment.filter(isPoint) : []);
+    };
+
+    // Clean existing out-of-bounds coordinates before updating
+    let cleanedCount = 0;
+
+    for (const street of existingStreets) {
+      const points = extractPoints(street.coordinates);
+
+      if (points.length === 0) continue;
+
+      const hasInBoundsPoint = points.some((point) => isInBounds(point[0], point[1]));
+
+      if (!hasInBoundsPoint) {
+        const { error: cleanError } = await supabase
+          .from('streets')
+          .update({ coordinates: null })
+          .eq('id', street.id);
+
+        if (cleanError) {
+          console.error(`Error clearing coordinates for ${street.name}:`, cleanError);
+        } else {
+          cleanedCount++;
+        }
+      }
+    }
 
     // Build a map of street name -> array of ways (each way is a separate segment)
     const streetGeometries = new Map<string, number[][][]>();
@@ -142,7 +180,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Update complete: ${updatedCount} updated, ${skippedCount} skipped, ${filteredCount} filtered out (outside bounds)`);
+    console.log(`Update complete: ${updatedCount} updated, ${skippedCount} skipped, ${filteredCount} filtered out (outside bounds), ${cleanedCount} cleaned from database`);
 
     return new Response(
       JSON.stringify({
@@ -153,7 +191,8 @@ Deno.serve(async (req) => {
           osmWays: osmData.elements.length,
           updated: updatedCount,
           skipped: skippedCount,
-          filtered: filteredCount
+          filtered: filteredCount,
+          cleaned: cleanedCount
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

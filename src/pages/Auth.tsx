@@ -9,11 +9,13 @@ import { toast } from "sonner";
 import { Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import logo from "@/assets/logo.png";
+import { useTextSize } from "@/hooks/useTextSize";
 
 const FIXED_CODE = "123456"; // Code fixe pour tous les utilisateurs
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { textSize, toggleTextSize, textSizeClass } = useTextSize();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -39,7 +41,7 @@ const Auth = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (code.length !== 6) {
       toast.error("Le code doit contenir 6 chiffres");
       return;
@@ -93,36 +95,41 @@ const Auth = () => {
         }
 
         if (signUpError) throw signUpError;
-        
+
         toast.success("Compte créé avec succès !");
       } else {
         toast.success("Connexion réussie !");
       }
-      
+
       navigate("/");
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la connexion");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Erreur lors de la connexion");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted to-background p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 text-center">
+    <div className={`min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted to-background p-4 ${textSizeClass}`}>
+      <Card className="w-full max-w-md shadow-lg border-2">
+        <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center mb-4">
             <img src={logo} alt="Agir Mieux Vivre" className="w-32 h-32 object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold">Tractage Portes-lès-Valence</CardTitle>
-          <CardDescription className="text-base">
-            Connexion instantanée
+          <CardTitle className="text-3xl font-extrabold">Tractage Portes-lès-Valence</CardTitle>
+          <CardDescription className="text-lg font-medium text-foreground">
+            Connexion instantanée avec le code communiqué
           </CardDescription>
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={toggleTextSize} className="text-base font-semibold">
+              {textSize === "large" ? "Texte normal" : "Agrandir le texte"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-base">Votre adresse email</Label>
+          <form onSubmit={handleLogin} className="space-y-8">
+            <div className="space-y-3">
+              <Label htmlFor="email" className="text-lg font-semibold">Votre adresse email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -131,15 +138,18 @@ const Auth = () => {
                   placeholder="votre.email@exemple.fr"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 text-base"
+                  className="pl-10 h-14 text-lg font-medium"
                   required
                   autoFocus
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="code" className="text-base">Code de connexion</Label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="code" className="text-lg font-semibold">Code de connexion</Label>
+                <span className="text-sm text-muted-foreground">6 chiffres</span>
+              </div>
               <div className="flex justify-center">
                 <InputOTP
                   maxLength={6}
@@ -158,20 +168,26 @@ const Auth = () => {
               </div>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                🔐 Connexion instantanée
+            <div className="bg-blue-50 dark:bg-blue-950 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-5 space-y-3">
+              <p className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                🔐 Connexion simplifiée
               </p>
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                Entrez votre email et le code qui vous a été communiqué.
+              <p className="text-base text-blue-700 dark:text-blue-300">
+                Entrez l'email autorisé par votre coordinateur puis le code fixe communiqué à l'équipe.
               </p>
+              <a
+                href="mailto:coordinateur@campagne.fr"
+                className="text-base font-semibold text-blue-900 underline"
+              >
+                Besoin d'aide ? Appelez ou écrivez à votre coordinateur
+              </a>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base" disabled={loading || code.length !== 6}>
+            <Button type="submit" className="w-full h-14 text-lg font-bold" disabled={loading || code.length !== 6}>
               {loading ? "Connexion..." : "Se connecter"}
             </Button>
 
-            <p className="text-xs text-center text-muted-foreground">
+            <p className="text-base text-center text-muted-foreground">
               Votre email doit être pré-enregistré par un coordinateur pour accéder à l'application
             </p>
           </form>
