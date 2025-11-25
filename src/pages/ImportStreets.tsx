@@ -6,13 +6,26 @@ import { toast } from "sonner";
 import { Download, MapPin, AlertCircle, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
-interface OverpassStreet {
-  type: string;
-  id: number;
-  tags: {
-    name?: string;
-    highway?: string;
+interface BANFeature {
+  type: "Feature";
+  geometry: {
+    type: "LineString" | "Point";
+    coordinates: number[][] | number[];
   };
+  properties: {
+    label: string;
+    name: string;
+    postcode: string;
+    citycode: string;
+    city: string;
+    type: string;
+    street?: string;
+    housenumber?: string;
+  };
+}
+
+interface BANResponse {
+  features: BANFeature[];
 }
 
 const ImportStreets = () => {
@@ -23,94 +36,80 @@ const ImportStreets = () => {
   const [skipped, setSkipped] = useState(0);
   const [updated, setUpdated] = useState(0);
 
-  const getStreetType = (highway: string): "street" | "avenue" | "impasse" | "boulevard" | "place" | "chemin" | "route" => {
-    const mapping: Record<string, any> = {
-      primary: "boulevard",
-      secondary: "avenue",
-      tertiary: "street",
-      residential: "street",
-      unclassified: "street",
-      living_street: "impasse",
-      pedestrian: "place",
-      footway: "chemin",
-      path: "chemin",
-      service: "chemin",
-    };
+  const getStreetType = (streetName: string): "street" | "avenue" | "impasse" | "boulevard" | "place" | "chemin" | "route" => {
+    const name = streetName.toLowerCase();
     
-    return mapping[highway] || "street";
+    if (name.includes("avenue") || name.startsWith("av ")) return "avenue";
+    if (name.includes("boulevard") || name.startsWith("bd ")) return "boulevard";
+    if (name.includes("impasse") || name.startsWith("imp ")) return "impasse";
+    if (name.includes("place") || name.startsWith("pl ")) return "place";
+    if (name.includes("chemin") || name.startsWith("ch ")) return "chemin";
+    if (name.includes("route") || name.startsWith("rte ")) return "route";
+    if (name.includes("rue") || name.startsWith("r ")) return "street";
+    
+    return "street";
   };
 
-  const fetchStreetsFromOverpass = async (): Promise<OverpassStreet[]> => {
-    // Requête Overpass API pour récupérer toutes les rues de Portes-lès-Valence avec géométrie
-    const query = `
-      [out:json][timeout:60];
-      area["name"="Portes-lès-Valence"]["admin_level"="8"]->.a;
-      (
-        way["highway"]["name"](area.a);
-        node["addr:housenumber"](area.a);
-      );
-      out body;
-      >;
-      out skel qt;
-    `;
-
-    const url = "https://overpass-api.de/api/interpreter";
+  const fetchStreetsFromBAN = async (): Promise<BANResponse> => {
+    // Code INSEE de Portes-lès-Valence: 26252
+    const url = "https://api-adresse.data.gouv.fr/search/?q=&citycode=26252&type=street&limit=1000";
     
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        body: `data=${encodeURIComponent(query)}`,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      });
+      const response = await fetch(url);
 
       if (!response.ok) {
-        throw new Error("Erreur lors de la récupération des données");
+        throw new Error("Erreur lors de la récupération des données BAN");
       }
 
-      const data = await response.json();
-      return data.elements || [];
+      const data: BANResponse = await response.json();
+      return data;
     } catch (error) {
       throw error;
     }
   };
 
-  const extractCoordinates = (street: any, allElements: any[]): number[][] => {
-    // If geometry is directly available (from out geom)
-    if (street.geometry && Array.isArray(street.geometry)) {
-      return street.geometry
-        .filter((g: any) => g.lat && g.lon)
-        .map((g: any) => [g.lat, g.lon]);
+  const extractCoordinates = (feature: BANFeature): number[][] => {
+    if (!feature.geometry || !feature.geometry.coordinates) {
+      return [];
+    }
+
+    // BAN returns [lon, lat] but we need [lat, lon] for Leaflet
+    if (feature.geometry.type === "LineString") {
+      return (feature.geometry.coordinates as number[][]).map(coord => [coord[1], coord[0]]);
+    } else if (feature.geometry.type === "Point") {
+      const coord = feature.geometry.coordinates as number[];
+      return [[coord[1], coord[0]]];
     }
     
-    // Otherwise, extract coordinates from nodes referenced by the way
-    if (street.nodes && Array.isArray(street.nodes)) {
-      const coords: number[][] = [];
-      street.nodes.forEach((nodeId: number) => {
-        const node = allElements.find((el: any) => el.type === 'node' && el.id === nodeId);
-        if (node && node.lat && node.lon) {
-          coords.push([node.lat, node.lon]);
-        }
-      });
-      return coords;
-    }
     return [];
   };
 
-  const getStreetNumbers = (elements: any[], streetName: string): number[] => {
-    const numbers: number[] = [];
-    
-    elements.forEach(element => {
-      if (element.type === 'node' && element.tags?.['addr:street'] === streetName && element.tags?.['addr:housenumber']) {
-        const houseNumber = parseInt(element.tags['addr:housenumber']);
-        if (!isNaN(houseNumber)) {
-          numbers.push(houseNumber);
+  const getStreetNumbers = async (streetName: string): Promise<number[]> => {
+    try {
+      // Récupérer toutes les adresses de cette rue via l'API BAN
+      const encodedStreet = encodeURIComponent(streetName);
+      const url = `https://api-adresse.data.gouv.fr/search/?q=${encodedStreet}&citycode=26252&type=housenumber&limit=1000`;
+      
+      const response = await fetch(url);
+      if (!response.ok) return [];
+      
+      const data: BANResponse = await response.json();
+      const numbers: number[] = [];
+      
+      data.features.forEach(feature => {
+        if (feature.properties.housenumber) {
+          const num = parseInt(feature.properties.housenumber);
+          if (!isNaN(num)) {
+            numbers.push(num);
+          }
         }
-      }
-    });
-    
-    return numbers.sort((a, b) => a - b);
+      });
+      
+      return numbers.sort((a, b) => a - b);
+    } catch (error) {
+      console.error("Erreur récupération numéros:", error);
+      return [];
+    }
   };
 
   const createSegmentsArray = (streetId: string, maxNumber: number): Array<{street_id: string, number_start: number, number_end: number, side: 'both' | 'even' | 'odd', building_type: 'mixed' | 'houses' | 'buildings'}> => {
@@ -150,18 +149,17 @@ const ImportStreets = () => {
     setSkipped(0);
 
     try {
-      toast.info("Récupération des rues depuis OpenStreetMap...");
+      toast.info("Récupération des rues depuis la Base Adresse Nationale...");
       
-      const elements = await fetchStreetsFromOverpass();
+      const banData = await fetchStreetsFromBAN();
       
-      if (elements.length === 0) {
+      if (!banData.features || banData.features.length === 0) {
         toast.warning("Aucune donnée trouvée");
         setLoading(false);
         return;
       }
 
-      // Filter only ways (streets)
-      const streets = elements.filter(el => el.type === 'way' && el.tags?.name);
+      const streets = banData.features;
       
       toast.info(`${streets.length} rues trouvées, importation avec segmentation automatique...`);
 
@@ -178,10 +176,9 @@ const ImportStreets = () => {
 
       for (let i = 0; i < streets.length; i++) {
         const street = streets[i];
-        const streetName = street.tags.name;
-        const streetType = street.tags.highway;
+        const streetName = street.properties.name;
 
-        if (!streetName || !streetType) {
+        if (!streetName) {
           skippedCount++;
           continue;
         }
@@ -206,15 +203,15 @@ const ImportStreets = () => {
           skippedCount++;
         } else {
           // Insert street
-          const coordinates = extractCoordinates(street, elements);
+          const coordinates = extractCoordinates(street);
           
           const { data, error } = await supabase
             .from("streets")
             .insert({
               name: streetName,
-              type: getStreetType(streetType),
+              type: getStreetType(streetName),
               district: "Importé",
-              neighborhood: "OpenStreetMap",
+              neighborhood: "Base Adresse Nationale",
               coordinates: coordinates.length > 0 ? coordinates : null,
             })
             .select()
@@ -234,8 +231,8 @@ const ImportStreets = () => {
 
         // Create segments if needed
         if (createSegments) {
-          // Get house numbers for this street
-          const numbers = getStreetNumbers(elements, streetName);
+          // Get house numbers for this street from BAN
+          const numbers = await getStreetNumbers(streetName);
           const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 100; // Default to 100 if no numbers found
 
           // Create segments
@@ -291,24 +288,22 @@ const ImportStreets = () => {
 
       toast.info(`Mise à jour des coordonnées pour ${existingStreets.length} rues...`);
 
-      // Fetch streets from OpenStreetMap
-      const elements = await fetchStreetsFromOverpass();
-      const streets = elements.filter(
-        (el: any) => el.type === "way" && el.tags?.highway && el.tags?.name
-      ) as OverpassStreet[];
+      // Fetch streets from BAN
+      const banData = await fetchStreetsFromBAN();
+      const streets = banData.features;
 
       let updatedCount = 0;
 
       for (let i = 0; i < existingStreets.length; i++) {
         const dbStreet = existingStreets[i];
         
-        // Find matching street in OSM data
-        const osmStreet = streets.find(
-          (s: OverpassStreet) => s.tags.name === dbStreet.name
+        // Find matching street in BAN data
+        const banStreet = streets.find(
+          (s: BANFeature) => s.properties.name === dbStreet.name
         );
 
-        if (osmStreet) {
-          const coordinates = extractCoordinates(osmStreet, elements);
+        if (banStreet) {
+          const coordinates = extractCoordinates(banStreet);
           
           if (coordinates.length > 0) {
             // Update coordinates
@@ -345,7 +340,7 @@ const ImportStreets = () => {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Import des rues</h1>
         <p className="text-muted-foreground">
-          Importez automatiquement les rues depuis OpenStreetMap
+          Importez automatiquement les rues depuis la Base Adresse Nationale
         </p>
       </div>
 
@@ -353,11 +348,11 @@ const ImportStreets = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="w-5 h-5" />
-            Import depuis OpenStreetMap
+            Import depuis la Base Adresse Nationale
           </CardTitle>
           <CardDescription>
-            Cette fonction récupère automatiquement toutes les rues de Portes-lès-Valence depuis la base 
-            de données OpenStreetMap via l'API Overpass.
+            Cette fonction récupère automatiquement toutes les rues officielles de Portes-lès-Valence depuis 
+            la Base Adresse Nationale (BAN), la base de données de référence des adresses en France.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -367,11 +362,11 @@ const ImportStreets = () => {
               <div className="space-y-1">
                 <p className="text-sm font-medium">Comment ça fonctionne ?</p>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>L'API Overpass d'OpenStreetMap est interrogée pour récupérer toutes les rues</li>
-                  <li>Les numéros de maison sont récupérés pour déterminer la longueur des rues</li>
+                  <li>L'API BAN est interrogée pour récupérer toutes les voies officielles (code INSEE: 26252)</li>
+                  <li>Les numéros de maison officiels sont récupérés pour chaque rue</li>
                   <li>Les rues sont segmentées automatiquement tous les 50 numéros</li>
                   <li>Les rues de moins de 50 numéros ont un seul segment</li>
-                  <li>L'import peut prendre quelques minutes selon le nombre de rues</li>
+                  <li>Données 100% officielles et exhaustives (IGN + DGFiP)</li>
                 </ul>
               </div>
             </div>
@@ -405,7 +400,7 @@ const ImportStreets = () => {
             ) : (
               <>
                 <Download className="w-4 h-4 mr-2" />
-                Importer les rues depuis OpenStreetMap
+                Importer les rues depuis la BAN
               </>
             )}
           </Button>
@@ -470,7 +465,7 @@ const ImportStreets = () => {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Source de données: © OpenStreetMap contributors, disponible sous la licence Open Database License (ODbL)
+            Source de données: Base Adresse Nationale (BAN) - © IGN & DGFiP - Données officielles de l'État français
           </p>
         </CardContent>
       </Card>
