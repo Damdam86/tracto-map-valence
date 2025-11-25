@@ -26,7 +26,7 @@ interface StreetWithStatus {
   id: string;
   name: string;
   type: string;
-  coordinates: number[][] | null;
+  coordinates: number[][] | number[][][] | null;
   segments: Array<{
     id: string;
     status: string;
@@ -162,26 +162,41 @@ const MapView = () => {
       if (!mapRef.current) return;
       
       try {
-        // Convert coordinates to Leaflet format [lat, lng]
-        const line: [number, number][] = street.coordinates!.map(coord => [coord[0], coord[1]]);
+        const coords = street.coordinates!;
         
-        const polyline = L.polyline(line, {
-          color: getStreetColor(street),
+        // Check if this is MultiLineString format (array of ways) or single LineString
+        const isMultiLineString = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
+        
+        const color = getStreetColor(street);
+        const polylineOptions = {
+          color,
           weight: 5,
           opacity: 0.9,
-        }).addTo(mapRef.current);
+        };
 
         // Calculate min and max numbers for this street
         const allNumbers = street.segments.flatMap(s => [s.number_start, s.number_end]);
         const minNumber = Math.min(...allNumbers);
         const maxNumber = Math.max(...allNumbers);
         
-        polyline.bindTooltip(
-          `<strong>${street.name}</strong><br/>${getStreetStatus(street)}<br/>N° ${minNumber} à ${maxNumber} (${street.segments.length} segment${street.segments.length > 1 ? 's' : ''})`,
-          { direction: 'top' }
-        );
+        const tooltipText = `<strong>${street.name}</strong><br/>${getStreetStatus(street)}<br/>N° ${minNumber} à ${maxNumber} (${street.segments.length} segment${street.segments.length > 1 ? 's' : ''})`;
 
-        polylinesRef.current.push(polyline);
+        if (isMultiLineString) {
+          // MultiLineString: array of ways (segments)
+          const ways = coords as number[][][];
+          ways.forEach((way) => {
+            const line: [number, number][] = way.map(coord => [coord[0], coord[1]]);
+            const polyline = L.polyline(line, polylineOptions).addTo(mapRef.current!);
+            polyline.bindTooltip(tooltipText, { direction: 'top' });
+            polylinesRef.current.push(polyline);
+          });
+        } else {
+          // Single LineString: simple array of points (legacy format)
+          const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
+          const polyline = L.polyline(line, polylineOptions).addTo(mapRef.current!);
+          polyline.bindTooltip(tooltipText, { direction: 'top' });
+          polylinesRef.current.push(polyline);
+        }
       } catch (error) {
         console.error(`Erreur lors de l'ajout de la rue ${street.name}:`, error);
       }
