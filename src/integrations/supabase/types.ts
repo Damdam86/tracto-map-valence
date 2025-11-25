@@ -184,6 +184,7 @@ export type Database = {
       }
       streets: {
         Row: {
+          coordinates: Json | null
           created_at: string
           district: string | null
           id: string
@@ -193,6 +194,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          coordinates?: Json | null
           created_at?: string
           district?: string | null
           id?: string
@@ -202,6 +204,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          coordinates?: Json | null
           created_at?: string
           district?: string | null
           id?: string

@@ -24,6 +24,7 @@ interface StreetWithStatus {
   id: string;
   name: string;
   type: string;
+  coordinates: number[][] | null;
   segments: Array<{
     id: string;
     status: string;
@@ -91,11 +92,13 @@ const MapView = () => {
 
       // Add new polylines
       streets.forEach((street) => {
-        const offset = Math.random() * 0.01;
-        const line: [number, number][] = [
-          [center[0] + offset, center[1] + offset],
-          [center[0] + offset + 0.002, center[1] + offset + 0.002],
-        ];
+        // Skip streets without coordinates
+        if (!street.coordinates || street.coordinates.length === 0) {
+          return;
+        }
+
+        // Convert coordinates to Leaflet format [lat, lng]
+        const line: [number, number][] = street.coordinates.map(coord => [coord[0], coord[1]]);
         
         const polyline = L.polyline(line, {
           color: getStreetColor(street),
@@ -159,7 +162,8 @@ const MapView = () => {
             street:streets (
               id,
               name,
-              type
+              type,
+              coordinates
             )
           )
         `)
@@ -180,6 +184,7 @@ const MapView = () => {
             id: streetId,
             name: cs.segment.street.name,
             type: cs.segment.street.type,
+            coordinates: cs.segment.street.coordinates,
             segments: [],
           });
         }
