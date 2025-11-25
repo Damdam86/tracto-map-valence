@@ -150,10 +150,12 @@ const Districts = () => {
     }
   };
 
-  const handleCloseDialog = () => {
-    setOpen(false);
-    setEditingDistrict(null);
-    setFormData({ name: "", description: "", color: "#3b82f6" });
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setEditingDistrict(null);
+      setFormData({ name: "", description: "", color: "#3b82f6" });
+    }
   };
 
   if (loading) {
@@ -173,7 +175,7 @@ const Districts = () => {
             Organisez les rues en quartiers pour faciliter les assignations
           </p>
         </div>
-        <Dialog open={open} onOpenChange={handleCloseDialog}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button size="lg" className="gap-2">
               <Plus className="w-5 h-5" />
@@ -232,7 +234,7 @@ const Districts = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
                   Annuler
                 </Button>
                 <Button type="submit">
