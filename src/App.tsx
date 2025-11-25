@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Volunteer from "./pages/Volunteer";
 import VolunteerSimple from "./pages/VolunteerSimple";
@@ -29,6 +30,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<Layout><Dashboard /></Layout>} />
           <Route path="/volunteer" element={<Layout><VolunteerSimple /></Layout>} />
           <Route path="/volunteer-advanced" element={<Layout><Volunteer /></Layout>} />
