@@ -66,41 +66,45 @@ const MapView = () => {
   }, [selectedCampaign]);
 
   useEffect(() => {
-    // Initialize map only once
+    // Initialize map
     if (!mapContainerRef.current) return;
     
-    if (!mapRef.current) {
-      // Create map
-      const map = L.map(mapContainerRef.current).setView(center, 14);
-      
-      // Add tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(map);
-      
-      // Add info control
-      const InfoControl = L.Control.extend({
-        onAdd: function () {
-          const div = L.DomUtil.create('div', 'leaflet-control-info');
-          div.style.padding = '10px';
-          div.style.background = 'white';
-          div.style.borderRadius = '5px';
-          div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-          div.innerHTML = '<h4 style="margin: 0 0 5px 0;">Progression</h4><p id="info-content" style="margin: 0; font-size: 12px;">Sélectionnez une campagne</p>';
-          return div;
-        }
-      });
-      
-      new InfoControl({ position: 'topright' }).addTo(map);
-      
-      mapRef.current = map;
-      
-      // Force a resize to ensure tiles load properly
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
+    // Clean up any existing map first
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
     }
+    
+    // Create new map
+    const map = L.map(mapContainerRef.current).setView(center, 14);
+    
+    // Add tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(map);
+    
+    // Add info control
+    const InfoControl = L.Control.extend({
+      onAdd: function () {
+        const div = L.DomUtil.create('div', 'leaflet-control-info');
+        div.style.padding = '10px';
+        div.style.background = 'white';
+        div.style.borderRadius = '5px';
+        div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+        div.innerHTML = '<h4 style="margin: 0 0 5px 0;">Progression</h4><p id="info-content" style="margin: 0; font-size: 12px;">Sélectionnez une campagne</p>';
+        return div;
+      }
+    });
+    
+    new InfoControl({ position: 'topright' }).addTo(map);
+    
+    mapRef.current = map;
+    
+    // Force a resize to ensure tiles load properly
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
 
     return () => {
       // Cleanup on unmount
