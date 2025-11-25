@@ -19,6 +19,9 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [isSendingCode, setIsSendingCode] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -47,52 +50,75 @@ const Auth = () => {
       return;
     }
 
-    if (code !== FIXED_CODE) {
-      toast.error("Code incorrect");
+    return () => clearInterval(timer);
+  }, [resendTimer]);
+
+  const sendOtp = async () => {
+    const trimmedEmail = email.toLowerCase().trim();
+
+    if (!trimmedEmail) {
+      toast.error("Merci de renseigner votre email");
+      return;
+    }
+
+    setIsSendingCode(true);
+
+    try {
+      const { data: invitation } = await supabase
+        .from("volunteer_invitations")
+        .select("email")
+        .eq("email", trimmedEmail)
+        .maybeSingle();
+
+      if (!invitation) {
+        toast.error("Cette adresse email n'est pas autorisée. Contactez votre coordinateur.");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: trimmedEmail,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (error) throw error;
+
+      setOtpSent(true);
+      setResendTimer(30);
+      toast.success("Code envoyé. Consultez vos emails (délai de quelques secondes).");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Impossible d'envoyer le code";
+      toast.error(message);
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!otpSent) {
+      toast.error("Envoyez d'abord le code à 6 chiffres");
+      return;
+    }
+
+    if (code.length !== 6) {
+      toast.error("Le code doit contenir 6 chiffres");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Check if email is pre-registered
-      const { data: invitation } = await supabase
-        .from("volunteer_invitations")
-        .select("email")
-        .eq("email", email.toLowerCase().trim())
-        .maybeSingle();
-
-      if (!invitation) {
-        toast.error("Cette adresse email n'est pas autorisée. Contactez votre coordinateur.");
-        setLoading(false);
-        return;
-      }
-
-      // Try to sign in first
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.verifyOtp({
         email: email.toLowerCase().trim(),
-        password: FIXED_CODE,
+        token: code,
+        type: "email",
       });
 
-      if (signInError) {
-        // If sign in fails, try to create account
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: email.toLowerCase().trim(),
-          password: FIXED_CODE,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-
-        // If user already exists but with wrong password, show clear message
-        if (signUpError?.message?.includes("already registered")) {
-          toast.error(
-            "Votre compte existe mais avec un mot de passe différent. Contactez votre coordinateur pour réinitialiser votre accès.",
-            { duration: 6000 }
-          );
-          setLoading(false);
-          return;
-        }
+      if (error) throw error;
 
         if (signUpError) throw signUpError;
 
@@ -143,6 +169,20 @@ const Auth = () => {
                   autoFocus
                 />
               </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={sendOtp}
+                  disabled={isSendingCode || resendTimer > 0}
+                  className="h-12 text-lg font-semibold"
+                >
+                  {isSendingCode ? "Envoi..." : resendTimer > 0 ? `Renvoyer dans ${resendTimer}s` : "Envoyer le code"}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Un email avec un code à 6 chiffres est envoyé immédiatement.
+                </p>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -165,6 +205,19 @@ const Auth = () => {
                     <InputOTPSlot index={5} />
                   </InputOTPGroup>
                 </InputOTP>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <p className="text-muted-foreground">Pas reçu ? Vérifiez vos spams.</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isSendingCode || resendTimer > 0}
+                  onClick={sendOtp}
+                  className="text-base font-semibold"
+                >
+                  Renvoyer le code
+                </Button>
               </div>
             </div>
 
