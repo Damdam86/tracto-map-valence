@@ -59,8 +59,8 @@ Deno.serve(async (req) => {
     
     console.log('Column indices:', { nomVoieIdx, codeInseeIdx, latIdx, lonIdx })
     
-    // Group addresses by street name
-    const streetMap = new Map<string, { coords: number[][], numbers: number[] }>()
+    // Group addresses by street name and calculate centroid
+    const streetMap = new Map<string, { lats: number[], lons: number[], numbers: number[] }>()
     
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i]
@@ -76,10 +76,11 @@ Deno.serve(async (req) => {
         
         if (nomVoie && !isNaN(lat) && !isNaN(lon)) {
           if (!streetMap.has(nomVoie)) {
-            streetMap.set(nomVoie, { coords: [], numbers: [] })
+            streetMap.set(nomVoie, { lats: [], lons: [], numbers: [] })
           }
           const street = streetMap.get(nomVoie)!
-          street.coords.push([lat, lon])
+          street.lats.push(lat)
+          street.lons.push(lon)
           
           // Extract house number if present
           const numeroCol = headers.indexOf('numero')
@@ -116,7 +117,12 @@ Deno.serve(async (req) => {
     
     // Process each street
     for (const [streetName, data] of streetMap.entries()) {
-      const { coords, numbers } = data
+      const { lats, lons, numbers } = data
+      
+      // Calculate centroid (average position of all addresses)
+      const centroidLat = lats.reduce((sum, lat) => sum + lat, 0) / lats.length
+      const centroidLon = lons.reduce((sum, lon) => sum + lon, 0) / lons.length
+      const centroid = [[centroidLat, centroidLon]]
       
       // Determine street type from name
       const getStreetType = (name: string) => {
@@ -131,11 +137,11 @@ Deno.serve(async (req) => {
       }
       
       if (existingNames.has(streetName)) {
-        // Update existing street with coordinates
+        // Update existing street with centroid coordinates
         const streetId = existingNames.get(streetName)!
         const { error } = await supabase
           .from('streets')
-          .update({ coordinates: coords })
+          .update({ coordinates: centroid })
           .eq('id', streetId)
         
         if (!error) {
@@ -150,7 +156,7 @@ Deno.serve(async (req) => {
             type: getStreetType(streetName),
             district: 'Importé',
             neighborhood: 'Base Adresse Nationale',
-            coordinates: coords
+            coordinates: centroid
           })
           .select()
           .single()
