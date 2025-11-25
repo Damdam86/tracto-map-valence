@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,44 +48,36 @@ const MapView = () => {
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [streets, setStreets] = useState<StreetWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef<L.Map | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement>(null);
   const polylinesRef = useRef<L.Polyline[]>([]);
   
   // Coordonnées de Portes-lès-Valence
   const center: [number, number] = [44.8771, 4.8772];
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCampaign) {
-      fetchStreetStatuses();
-    }
-  }, [selectedCampaign]);
-
-  // Force map recreation on component mount by updating key
-  useEffect(() => {
-    console.log('🔄 MapView mounted, forcing map recreation');
-    setMapKey(prev => prev + 1);
-  }, []);
-
-  useEffect(() => {
-    // Initialize map
-    if (!mapContainerRef.current) {
-      console.log('⚠️ Map container not ready');
+  // Callback ref for map container - guarantees DOM is ready before map creation
+  const mapContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) {
+      // Cleanup when component unmounts
+      if (mapRef.current) {
+        console.log('🧹 Removing map on unmount');
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
       return;
     }
+
+    // If a map already exists, destroy it first
+    if (mapRef.current) {
+      console.log('🧹 Removing existing map before recreating');
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+
+    console.log('🗺️ Creating new map instance with callback ref');
     
-    console.log('🗺️ Creating new map instance (key:', mapKey, ')');
+    // Create the new map
+    const map = L.map(node).setView(center, 14);
     
-    // Create new map
-    const map = L.map(mapContainerRef.current).setView(center, 14);
-    console.log('✅ Map created successfully');
-    
-    // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19
@@ -108,21 +100,22 @@ const MapView = () => {
     
     mapRef.current = map;
     
-    // Force a resize to ensure tiles load properly
+    // Force invalidation to ensure tiles load properly
     setTimeout(() => {
       map.invalidateSize();
-      console.log('📐 Map size invalidated');
+      console.log('✅ Map ready and tiles loading');
     }, 100);
+  }, []);
 
-    return () => {
-      // Cleanup on unmount
-      console.log('🧹 Cleaning up map instance');
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, [mapKey]);
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCampaign) {
+      fetchStreetStatuses();
+    }
+  }, [selectedCampaign]);
 
   useEffect(() => {
     // Update polylines when streets change
@@ -450,7 +443,6 @@ const MapView = () => {
             </div>
           </div>
           <div 
-            key={mapKey}
             ref={mapContainerRef}
             className="w-full h-[75vh] md:h-[calc(100vh-400px)] min-h-[500px] rounded-lg overflow-hidden border relative"
           >
