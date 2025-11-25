@@ -64,18 +64,41 @@ const Auth = () => {
     setIsSendingCode(true);
 
     try {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Essayer d'abord de se connecter
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        token: code,
-        type: "email",
+        email: normalizedEmail,
+        password: FIXED_CODE,
       });
 
+      // Si l'utilisateur n'existe pas encore, on le crée automatiquement avec le même code
       if (signInError) {
-        toast.error(
-          "Impossible de vous connecter avec ce code. Vérifiez l'email saisi ou contactez votre coordinateur pour activer votre compte.",
-          { duration: 6000 }
-        );
-        return;
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password: FIXED_CODE,
+        });
+
+        if (signUpError) {
+          toast.error(
+            "Impossible de créer votre accès. Vérifiez l'email saisi ou contactez votre coordinateur.",
+            { duration: 6000 }
+          );
+          return;
+        }
+
+        const { error: signInAfterSignupError } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password: FIXED_CODE,
+        });
+
+        if (signInAfterSignupError) {
+          toast.error(
+            "Compte créé mais connexion impossible. Merci de réessayer dans un instant ou d'appeler votre coordinateur.",
+            { duration: 6000 }
+          );
+          return;
+        }
       }
 
       toast.success("Connexion réussie !");
