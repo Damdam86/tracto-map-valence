@@ -39,12 +39,13 @@ const ImportStreets = () => {
   };
 
   const fetchStreetsFromOverpass = async (): Promise<OverpassStreet[]> => {
-    // Requête Overpass API pour récupérer toutes les rues de Portes-lès-Valence
+    // Requête Overpass API pour récupérer toutes les rues de Portes-lès-Valence avec les numéros
     const query = `
-      [out:json][timeout:30];
+      [out:json][timeout:60];
       area["name"="Portes-lès-Valence"]["admin_level"="8"]->.a;
       (
         way["highway"]["name"](area.a);
+        node["addr:housenumber"](area.a);
       );
       out body;
     `;
@@ -71,6 +72,51 @@ const ImportStreets = () => {
     }
   };
 
+  const getStreetNumbers = (elements: any[], streetName: string): number[] => {
+    const numbers: number[] = [];
+    
+    elements.forEach(element => {
+      if (element.type === 'node' && element.tags?.['addr:street'] === streetName && element.tags?.['addr:housenumber']) {
+        const houseNumber = parseInt(element.tags['addr:housenumber']);
+        if (!isNaN(houseNumber)) {
+          numbers.push(houseNumber);
+        }
+      }
+    });
+    
+    return numbers.sort((a, b) => a - b);
+  };
+
+  const createSegments = (streetId: string, maxNumber: number): Array<{street_id: string, number_start: number, number_end: number, side: 'both' | 'even' | 'odd', building_type: 'mixed' | 'houses' | 'buildings'}> => {
+    const segments = [];
+    const segmentSize = 50;
+    
+    if (maxNumber <= segmentSize) {
+      // Si la rue a moins de 50 numéros, un seul segment
+      segments.push({
+        street_id: streetId,
+        number_start: 1,
+        number_end: maxNumber,
+        side: 'both' as const,
+        building_type: 'mixed' as const
+      });
+    } else {
+      // Sinon, découper en segments de 50
+      for (let start = 1; start <= maxNumber; start += segmentSize) {
+        const end = Math.min(start + segmentSize - 1, maxNumber);
+        segments.push({
+          street_id: streetId,
+          number_start: start,
+          number_end: end,
+          side: 'both' as const,
+          building_type: 'mixed' as const
+        });
+      }
+    }
+    
+    return segments;
+  };
+
   const handleImport = async () => {
     setLoading(true);
     setProgress(0);
@@ -80,25 +126,29 @@ const ImportStreets = () => {
     try {
       toast.info("Récupération des rues depuis OpenStreetMap...");
       
-      const streets = await fetchStreetsFromOverpass();
+      const elements = await fetchStreetsFromOverpass();
       
-      if (streets.length === 0) {
-        toast.warning("Aucune rue trouvée");
+      if (elements.length === 0) {
+        toast.warning("Aucune donnée trouvée");
         setLoading(false);
         return;
       }
 
-      toast.info(`${streets.length} rues trouvées, importation en cours...`);
+      // Filter only ways (streets)
+      const streets = elements.filter(el => el.type === 'way' && el.tags?.name);
+      
+      toast.info(`${streets.length} rues trouvées, importation avec segmentation automatique...`);
 
       // Get existing streets to avoid duplicates
       const { data: existingStreets } = await supabase
         .from("streets")
-        .select("name");
+        .select("id, name");
       
-      const existingNames = new Set(existingStreets?.map(s => s.name) || []);
+      const existingNames = new Map(existingStreets?.map(s => [s.name, s.id]) || []);
 
       let importedCount = 0;
       let skippedCount = 0;
+      let segmentsCreated = 0;
 
       for (let i = 0; i < streets.length; i++) {
         const street = streets[i];
@@ -110,28 +160,50 @@ const ImportStreets = () => {
           continue;
         }
 
-        // Skip if already exists
+        let streetId: string;
+
+        // Check if already exists
         if (existingNames.has(streetName)) {
+          streetId = existingNames.get(streetName)!;
           skippedCount++;
-          setProgress(((i + 1) / streets.length) * 100);
-          continue;
+        } else {
+          // Insert street
+          const { data, error } = await supabase
+            .from("streets")
+            .insert({
+              name: streetName,
+              type: getStreetType(streetType),
+              district: "Importé",
+              neighborhood: "OpenStreetMap",
+            })
+            .select()
+            .single();
+
+          if (error || !data) {
+            skippedCount++;
+            setProgress(((i + 1) / streets.length) * 100);
+            continue;
+          }
+
+          streetId = data.id;
+          importedCount++;
+          existingNames.set(streetName, streetId);
         }
 
-        // Insert street
-        const { error } = await supabase
-          .from("streets")
-          .insert({
-            name: streetName,
-            type: getStreetType(streetType),
-            district: "Importé",
-            neighborhood: "OpenStreetMap",
-          });
+        // Get house numbers for this street
+        const numbers = getStreetNumbers(elements, streetName);
+        const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 100; // Default to 100 if no numbers found
 
-        if (!error) {
-          importedCount++;
-          existingNames.add(streetName);
-        } else {
-          skippedCount++;
+        // Create segments
+        const segments = createSegments(streetId, maxNumber);
+        
+        // Insert segments
+        const { error: segError } = await supabase
+          .from("segments")
+          .insert(segments);
+
+        if (!segError) {
+          segmentsCreated += segments.length;
         }
 
         setImported(importedCount);
@@ -139,12 +211,12 @@ const ImportStreets = () => {
         setProgress(((i + 1) / streets.length) * 100);
 
         // Small delay to avoid overwhelming the UI
-        if (i % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 50));
+        if (i % 5 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
-      toast.success(`Import terminé ! ${importedCount} rue(s) importée(s), ${skippedCount} ignorée(s)`);
+      toast.success(`Import terminé ! ${importedCount} rue(s) importée(s), ${segmentsCreated} segment(s) créé(s), ${skippedCount} ignorée(s)`);
     } catch (error: any) {
       console.error("Import error:", error);
       toast.error("Erreur lors de l'import: " + error.message);
@@ -181,8 +253,9 @@ const ImportStreets = () => {
                 <p className="text-sm font-medium">Comment ça fonctionne ?</p>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                   <li>L'API Overpass d'OpenStreetMap est interrogée pour récupérer toutes les rues</li>
-                  <li>Les rues déjà présentes dans la base sont ignorées</li>
-                  <li>Les nouvelles rues sont automatiquement classées par type</li>
+                  <li>Les numéros de maison sont récupérés pour déterminer la longueur des rues</li>
+                  <li>Les rues sont segmentées automatiquement tous les 50 numéros</li>
+                  <li>Les rues de moins de 50 numéros ont un seul segment</li>
                   <li>L'import peut prendre quelques minutes selon le nombre de rues</li>
                 </ul>
               </div>

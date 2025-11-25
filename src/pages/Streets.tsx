@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, Map, Trash2, Edit, MapPin } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 interface Street {
   id: string;
@@ -38,6 +39,9 @@ const Streets = () => {
   const [selectedStreetId, setSelectedStreetId] = useState<string>("");
   const [editingStreet, setEditingStreet] = useState<Street | null>(null);
   const [editingSegment, setEditingSegment] = useState<Segment | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const itemsPerPage = 20;
 
   const [streetFormData, setStreetFormData] = useState({
     name: "",
@@ -56,15 +60,28 @@ const Streets = () => {
   });
 
   useEffect(() => {
+    setLoading(true);
     fetchStreets();
-  }, []);
+  }, [currentPage]);
 
   const fetchStreets = async () => {
     try {
+      // Get total count
+      const { count } = await supabase
+        .from("streets")
+        .select("*", { count: 'exact', head: true });
+      
+      setTotalCount(count || 0);
+
+      // Fetch paginated streets
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
+
       const { data, error } = await supabase
         .from("streets")
         .select("*")
-        .order("name");
+        .order("name")
+        .range(from, to);
 
       if (error) throw error;
       setStreets(data || []);
@@ -241,7 +258,7 @@ const Streets = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Rues & Segments</h1>
           <p className="text-muted-foreground">
-            Gérez les rues et leurs segments de distribution
+            Gérez les rues et leurs segments de distribution {totalCount > 0 && `(${totalCount} rue${totalCount > 1 ? 's' : ''})`}
           </p>
         </div>
         <Dialog open={streetDialogOpen} onOpenChange={setStreetDialogOpen}>
@@ -563,6 +580,49 @@ const Streets = () => {
             </AccordionItem>
           ))}
         </Accordion>
+      )}
+
+      {totalCount > itemsPerPage && (
+        <Pagination className="mt-6">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (currentPage > 1) setCurrentPage(currentPage - 1);
+                }}
+                className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+              />
+            </PaginationItem>
+            
+            {Array.from({ length: Math.ceil(totalCount / itemsPerPage) }, (_, i) => i + 1).map(page => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(page);
+                  }}
+                  isActive={currentPage === page}
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            
+            <PaginationItem>
+              <PaginationNext 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (currentPage < Math.ceil(totalCount / itemsPerPage)) setCurrentPage(currentPage + 1);
+                }}
+                className={currentPage >= Math.ceil(totalCount / itemsPerPage) ? 'pointer-events-none opacity-50' : ''}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       )}
     </div>
   );
