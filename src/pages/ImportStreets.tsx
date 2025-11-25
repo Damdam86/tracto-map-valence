@@ -9,13 +9,10 @@ import { Progress } from "@/components/ui/progress";
 const ImportStreets = () => {
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [updatingGeometries, setUpdatingGeometries] = useState(false);
   const [progress, setProgress] = useState(0);
   const [imported, setImported] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [updated, setUpdated] = useState(0);
-  const [geometriesUpdated, setGeometriesUpdated] = useState(0);
-  const [geometriesFailed, setGeometriesFailed] = useState(0);
 
   const handleImport = async () => {
     setLoading(true);
@@ -90,41 +87,6 @@ const ImportStreets = () => {
     }
   };
 
-  const handleUpdateGeometries = async () => {
-    setUpdatingGeometries(true);
-    setGeometriesUpdated(0);
-    setGeometriesFailed(0);
-
-    try {
-      toast.info("Récupération des géométries complètes depuis OpenStreetMap...");
-      toast.info("⏳ Cette opération peut prendre plusieurs minutes...");
-      
-      const { data, error } = await supabase.functions.invoke('update-street-geometries');
-      
-      if (error) {
-        throw new Error(error.message || "Erreur lors de la mise à jour des géométries");
-      }
-      
-      if (!data) {
-        toast.warning("Aucune donnée reçue");
-        setUpdatingGeometries(false);
-        return;
-      }
-      
-      setGeometriesUpdated(data.updated || 0);
-      setGeometriesFailed(data.failed || 0);
-      
-      toast.success(
-        `Mise à jour terminée ! ${data.updated} géométrie(s) mise(s) à jour, ${data.failed} échec(s)`
-      );
-    } catch (error: any) {
-      console.error("Geometry update error:", error);
-      toast.error("Erreur lors de la mise à jour: " + (error?.message || "Erreur inconnue"));
-    } finally {
-      setUpdatingGeometries(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -180,7 +142,7 @@ const ImportStreets = () => {
 
           <Button
             onClick={handleImport}
-            disabled={loading || updating || updatingGeometries}
+            disabled={loading || updating}
             className="w-full"
             size="lg"
           >
@@ -229,7 +191,7 @@ const ImportStreets = () => {
             
             <Button 
               onClick={handleUpdateCoordinates} 
-              disabled={loading || updating || updatingGeometries}
+              disabled={loading || updating}
               variant="outline"
               className="w-full"
               size="lg"
@@ -251,58 +213,6 @@ const ImportStreets = () => {
               <div className="mt-4 p-4 bg-muted rounded-lg">
                 <p className="text-sm">
                   <strong>{updated}</strong> rue(s) mise(s) à jour
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-6 pt-6 border-t">
-            <h3 className="font-semibold mb-2">Mettre à jour les géométries complètes</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Pour les rues qui n'ont qu'un point GPS (centroïde), cette fonction récupère 
-              la géométrie complète depuis OpenStreetMap pour un affichage précis sur la carte.
-              <br />
-              <span className="text-xs">⚠️ Cette opération prend du temps (1s par rue)</span>
-            </p>
-            
-            {updatingGeometries && (
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">Traitement en cours...</span>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Mises à jour: {geometriesUpdated} | Échecs: {geometriesFailed}
-                </div>
-              </div>
-            )}
-            
-            <Button 
-              onClick={handleUpdateGeometries} 
-              disabled={loading || updating || updatingGeometries}
-              variant="outline"
-              className="w-full"
-              size="lg"
-            >
-              {updatingGeometries ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Mise à jour des géométries...
-                </>
-              ) : (
-                <>
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Mettre à jour les géométries OSM
-                </>
-              )}
-            </Button>
-
-            {(geometriesUpdated > 0 || geometriesFailed > 0) && !updatingGeometries && (
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <p className="text-sm">
-                  <strong>{geometriesUpdated}</strong> géométrie(s) mise(s) à jour
-                  <br />
-                  <strong>{geometriesFailed}</strong> échec(s)
                 </p>
               </div>
             )}

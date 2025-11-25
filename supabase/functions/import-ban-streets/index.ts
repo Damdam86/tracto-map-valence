@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
       (
         way["highway"~"^(residential|tertiary|secondary|primary|unclassified|service|living_street|pedestrian)$"]["name"](44.84,4.83,44.91,4.93);
       );
-      out center;
+      out geom;
     `
     
     const overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
@@ -235,12 +235,37 @@ Deno.serve(async (req) => {
       
       for (const element of osmData.elements || []) {
         const streetName = element.tags?.name
-        if (!streetName || currentNames.has(streetName)) continue
+        if (!streetName) continue
         
-        const lat = element.center?.lat || element.lat
-        const lon = element.center?.lon || element.lon
+        // Parse full geometry from OSM
+        let coordinates: number[][] = []
+        if (element.geometry && Array.isArray(element.geometry)) {
+          coordinates = element.geometry.map((node: any) => [node.lat, node.lon])
+        } else if (element.center) {
+          // Fallback to center if geometry not available
+          coordinates = [[element.center.lat, element.center.lon]]
+        }
         
-        if (!lat || !lon) continue
+        if (coordinates.length === 0) continue
+        
+        // If street exists, update it with full geometry
+        if (currentNames.has(streetName)) {
+          const { data: existingStreet } = await supabase
+            .from('streets')
+            .select('id, coordinates')
+            .eq('name', streetName)
+            .single()
+          
+          // Only update if current street has single point (centroid)
+          if (existingStreet && existingStreet.coordinates && existingStreet.coordinates.length === 1) {
+            await supabase
+              .from('streets')
+              .update({ coordinates })
+              .eq('id', existingStreet.id)
+            results.updated++
+          }
+          continue
+        }
         
         // Determine street type from name
         const getStreetType = (name: string) => {
@@ -261,7 +286,7 @@ Deno.serve(async (req) => {
             type: getStreetType(streetName),
             district: 'Importé',
             neighborhood: 'OpenStreetMap',
-            coordinates: [[lat, lon]]
+            coordinates: coordinates
           })
           .select()
           .single()
