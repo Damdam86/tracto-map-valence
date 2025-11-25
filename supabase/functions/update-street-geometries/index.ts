@@ -55,6 +55,22 @@ Deno.serve(async (req) => {
 
     let updatedCount = 0;
     let skippedCount = 0;
+    let filteredCount = 0;
+
+    // Strict bounding box for Portes-lès-Valence (excluding Ardèche on the other side of Rhône)
+    // These coordinates are tighter to avoid capturing streets in Ardèche
+    const BBOX = {
+      minLat: 44.84,
+      maxLat: 44.90,
+      minLon: 4.85,
+      maxLon: 4.92
+    };
+
+    // Function to check if a coordinate is within strict bounds
+    const isInBounds = (lat: number, lon: number) => {
+      return lat >= BBOX.minLat && lat <= BBOX.maxLat && 
+             lon >= BBOX.minLon && lon <= BBOX.maxLon;
+    };
 
     // Build a map of street name -> array of ways (each way is a separate segment)
     const streetGeometries = new Map<string, number[][][]>();
@@ -74,6 +90,22 @@ Deno.serve(async (req) => {
         console.log(`No coordinates for ${streetName}, skipping element`);
         skippedCount++;
         continue;
+      }
+
+      // Filter out coordinates that are outside the strict bounding box
+      // This removes streets on the Ardèche side of the Rhône
+      const allPointsInBounds = coordinates.every((coord: number[]) => isInBounds(coord[0], coord[1]));
+      
+      if (!allPointsInBounds) {
+        // Check if at least 50% of points are in bounds before filtering
+        const pointsInBounds = coordinates.filter((coord: number[]) => isInBounds(coord[0], coord[1]));
+        if (pointsInBounds.length < coordinates.length * 0.5) {
+          console.log(`Filtering out ${streetName} - mostly outside Portes-lès-Valence bounds`);
+          filteredCount++;
+          continue;
+        }
+        // Keep only the points within bounds
+        coordinates.splice(0, coordinates.length, ...pointsInBounds);
       }
 
       // Keep each OSM way as a separate segment to avoid connecting non-contiguous parts
@@ -110,7 +142,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Update complete: ${updatedCount} updated, ${skippedCount} skipped`);
+    console.log(`Update complete: ${updatedCount} updated, ${skippedCount} skipped, ${filteredCount} filtered out (outside bounds)`);
 
     return new Response(
       JSON.stringify({
@@ -120,7 +152,8 @@ Deno.serve(async (req) => {
           totalStreets: existingStreets.length,
           osmWays: osmData.elements.length,
           updated: updatedCount,
-          skipped: skippedCount
+          skipped: skippedCount,
+          filtered: filteredCount
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
