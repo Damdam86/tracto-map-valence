@@ -51,8 +51,9 @@ const MapView = () => {
   const mapRef = useRef<L.Map | null>(null);
   const polylinesRef = useRef<L.Polyline[]>([]);
   
-  // Coordonnées de Portes-lès-Valence
+  // Coordonnées de Portes-lès-Valence avec zoom ajusté
   const center: [number, number] = [44.8771, 4.8772];
+  const defaultZoom = 15; // Zoom plus proche pour mieux voir la ville
 
   // Callback ref for map container - guarantees DOM is ready before map creation
   const mapContainerRef = useCallback((node: HTMLDivElement | null) => {
@@ -75,8 +76,8 @@ const MapView = () => {
 
     console.log('🗺️ Creating new map instance with callback ref');
     
-    // Create the new map
-    const map = L.map(node).setView(center, 14);
+    // Create the new map with closer zoom on Portes-lès-Valence
+    const map = L.map(node).setView(center, defaultZoom);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
