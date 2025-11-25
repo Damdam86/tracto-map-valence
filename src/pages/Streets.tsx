@@ -355,14 +355,14 @@ const Streets = () => {
               <div className="space-y-2">
                 <Label htmlFor="district_select">Quartier (cluster)</Label>
                 <Select
-                  value={streetFormData.district_id}
-                  onValueChange={(value) => setStreetFormData({ ...streetFormData, district_id: value })}
+                  value={streetFormData.district_id || "none"}
+                  onValueChange={(value) => setStreetFormData({ ...streetFormData, district_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionnez un quartier" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun quartier</SelectItem>
+                    <SelectItem value="none">Aucun quartier</SelectItem>
                     {districts.map((district) => (
                       <SelectItem key={district.id} value={district.id}>
                         <span className="flex items-center gap-2">
