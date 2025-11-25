@@ -48,6 +48,7 @@ const MapView = () => {
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [streets, setStreets] = useState<StreetWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(0);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const polylinesRef = useRef<L.Polyline[]>([]);
@@ -65,18 +66,32 @@ const MapView = () => {
     }
   }, [selectedCampaign]);
 
+  // Force map reinitialization on every component mount
   useEffect(() => {
-    // Initialize map
-    if (!mapContainerRef.current) return;
+    console.log('🔄 MapView mounted, triggering map initialization');
+    setMapReady(prev => prev + 1);
+    
+    return () => {
+      console.log('🧹 MapView unmounting, cleaning up map');
+    };
+  }, []);
+
+  useEffect(() => {
+    // Initialize map whenever mapReady changes (on every mount)
+    if (!mapContainerRef.current || mapReady === 0) return;
+    
+    console.log('🗺️ Initializing map (mapReady:', mapReady, ')');
     
     // Clean up any existing map first
     if (mapRef.current) {
+      console.log('🧹 Removing existing map instance');
       mapRef.current.remove();
       mapRef.current = null;
     }
     
     // Create new map
     const map = L.map(mapContainerRef.current).setView(center, 14);
+    console.log('✅ Map created successfully');
     
     // Add tile layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -104,16 +119,18 @@ const MapView = () => {
     // Force a resize to ensure tiles load properly
     setTimeout(() => {
       map.invalidateSize();
+      console.log('📐 Map size invalidated');
     }, 100);
 
     return () => {
       // Cleanup on unmount
       if (mapRef.current) {
+        console.log('🧹 Cleaning up map on effect cleanup');
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [mapReady]);
 
   useEffect(() => {
     // Update polylines when streets change
