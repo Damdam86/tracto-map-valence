@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { MapPin, Mail, Lock } from "lucide-react";
+import { Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import logo from "@/assets/logo.png";
 
 const FIXED_CODE = "123456"; // Code fixe pour tous les utilisateurs
 
@@ -111,9 +112,7 @@ const Auth = () => {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary rounded-full">
-              <MapPin className="w-8 h-8 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Agir Mieux Vivre" className="w-32 h-32 object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold">Tractage Portes-lès-Valence</CardTitle>
           <CardDescription className="text-base">
