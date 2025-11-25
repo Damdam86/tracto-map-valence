@@ -1,29 +1,29 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log('Starting street geometries update...');
+    console.log("Starting street geometries update...");
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch all existing streets
     const { data: existingStreets, error: fetchError } = await supabase
-      .from('streets')
-      .select('id, name, type, coordinates');
+      .from("streets")
+      .select("id, name, type, coordinates");
 
     if (fetchError) {
-      console.error('Error fetching streets:', fetchError);
+      console.error("Error fetching streets:", fetchError);
       throw fetchError;
     }
 
@@ -39,11 +39,11 @@ Deno.serve(async (req) => {
       out geom;
     `;
 
-    console.log('Fetching data from OpenStreetMap...');
-    const overpassResponse = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
+    console.log("Fetching data from OpenStreetMap...");
+    const overpassResponse = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
       body: overpassQuery,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
     });
 
     if (!overpassResponse.ok) {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       minLat: 44.865,
       maxLat: 44.885,
       minLon: 4.865,
-      maxLon: 4.895
+      maxLon: 4.895,
     };
 
     // Function to check if a coordinate is within strict bounds
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       // Filter out coordinates that are outside the strict bounding box
       // This removes streets on the Ardèche side of the Rhône
       const allPointsInBounds = coordinates.every((coord: number[]) => isInBounds(coord[0], coord[1]));
-      
+
       if (!allPointsInBounds) {
         // Check if at least 50% of points are in bounds before filtering
         const pointsInBounds = coordinates.filter((coord: number[]) => isInBounds(coord[0], coord[1]));
@@ -167,10 +167,7 @@ Deno.serve(async (req) => {
       // Store as MultiLineString format (array of ways)
       const totalPoints = ways.reduce((sum, way) => sum + way.length, 0);
 
-      const { error: updateError } = await supabase
-        .from('streets')
-        .update({ coordinates: ways })
-        .eq('id', s.id);
+      const { error: updateError } = await supabase.from("streets").update({ coordinates: ways }).eq("id", s.id);
 
       if (updateError) {
         console.error(`Error updating ${s.name}:`, updateError);
@@ -185,7 +182,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Geometries updated successfully',
+        message: "Geometries updated successfully",
         stats: {
           totalStreets: existingStreets.length,
           osmWays: osmData.elements.length,
@@ -195,21 +192,20 @@ Deno.serve(async (req) => {
           cleaned: cleanedCount
         }
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error) {
-    console.error('Error in update-street-geometries:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("Error in update-street-geometries:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage,
-        details: 'Failed to update street geometries'
+        details: "Failed to update street geometries",
       }),
-      { 
+      {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });
