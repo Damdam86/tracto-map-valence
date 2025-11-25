@@ -56,8 +56,8 @@ Deno.serve(async (req) => {
     let updatedCount = 0;
     let skippedCount = 0;
 
-    // Build a map of street name -> full merged geometry (all ways for that name)
-    const streetGeometries = new Map<string, number[][]>();
+    // Build a map of street name -> array of ways (each way is a separate segment)
+    const streetGeometries = new Map<string, number[][][]>();
 
     for (const element of osmData.elements) {
       if (!element.tags?.name || !element.geometry) {
@@ -76,31 +76,36 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const existingCoords = streetGeometries.get(key) ?? [];
-      streetGeometries.set(key, [...existingCoords, ...coordinates]);
+      // Keep each OSM way as a separate segment to avoid connecting non-contiguous parts
+      const existingWays = streetGeometries.get(key) ?? [];
+      existingWays.push(coordinates);
+      streetGeometries.set(key, existingWays);
     }
 
-    console.log(`Built merged geometries for ${streetGeometries.size} distinct street names`);
+    console.log(`Built geometries for ${streetGeometries.size} distinct street names`);
 
-    // Now update existing streets using the merged geometries (case-insensitive match)
+    // Now update existing streets using the segmented geometries (case-insensitive match)
     for (const s of existingStreets) {
       const key = s.name.trim().toLowerCase();
-      const mergedCoords = streetGeometries.get(key);
+      const ways = streetGeometries.get(key);
 
-      if (!mergedCoords || mergedCoords.length === 0) {
+      if (!ways || ways.length === 0) {
         skippedCount++;
         continue;
       }
 
+      // Store as MultiLineString format (array of ways)
+      const totalPoints = ways.reduce((sum, way) => sum + way.length, 0);
+
       const { error: updateError } = await supabase
         .from('streets')
-        .update({ coordinates: mergedCoords })
+        .update({ coordinates: ways })
         .eq('id', s.id);
 
       if (updateError) {
         console.error(`Error updating ${s.name}:`, updateError);
       } else {
-        console.log(`✓ Updated ${s.name} with ${mergedCoords.length} points`);
+        console.log(`✓ Updated ${s.name} with ${ways.length} segment(s) (${totalPoints} points total)`);
         updatedCount++;
       }
     }
