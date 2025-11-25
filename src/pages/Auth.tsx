@@ -64,61 +64,31 @@ const Auth = () => {
     setIsSendingCode(true);
 
     try {
-      const { data: invitation } = await supabase
-        .from("volunteer_invitations")
-        .select("email")
-        .eq("email", trimmedEmail)
-        .maybeSingle();
-
-      if (!invitation) {
-        toast.error("Cette adresse email n'est pas autorisée. Contactez votre coordinateur.");
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-
-      if (error) throw error;
-
-      setOtpSent(true);
-      setResendTimer(30);
-      toast.success("Code envoyé. Consultez vos emails (délai de quelques secondes).");
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Impossible d'envoyer le code";
-      toast.error(message);
-    } finally {
-      setIsSendingCode(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!otpSent) {
-      toast.error("Envoyez d'abord le code à 6 chiffres");
-      return;
-    }
-
-    if (code.length !== 6) {
-      toast.error("Le code doit contenir 6 chiffres");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.verifyOtp({
+      // Try to sign in first
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         token: code,
         type: "email",
       });
 
-      if (error) throw error;
+      if (signInError) {
+        // If sign in fails, try to create account
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: email.toLowerCase().trim(),
+          password: FIXED_CODE,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
+
+        if (signUpError?.message?.includes("already registered")) {
+          toast.error(
+            "Votre compte existe déjà avec un autre mot de passe. Demandez au coordinateur de le réinitialiser.",
+            { duration: 6000 }
+          );
+          setLoading(false);
+          return;
+        }
 
         if (signUpError) throw signUpError;
 
@@ -129,7 +99,11 @@ const Auth = () => {
 
       navigate("/");
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Erreur lors de la connexion");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la connexion. Vérifiez votre connexion internet et réessayez."
+      );
     } finally {
       setLoading(false);
     }
@@ -144,7 +118,7 @@ const Auth = () => {
           </div>
           <CardTitle className="text-3xl font-extrabold">Tractage Portes-lès-Valence</CardTitle>
           <CardDescription className="text-lg font-medium text-foreground">
-            Connexion instantanée avec le code communiqué
+            Connexion instantanée avec le code communiqué (pas de mail à attendre)
           </CardDescription>
           <div className="flex justify-center">
             <Button variant="outline" size="sm" onClick={toggleTextSize} className="text-base font-semibold">
@@ -226,7 +200,7 @@ const Auth = () => {
                 🔐 Connexion simplifiée
               </p>
               <p className="text-base text-blue-700 dark:text-blue-300">
-                Entrez l'email autorisé par votre coordinateur puis le code fixe communiqué à l'équipe.
+                Entrez votre email habituel puis le code fixe communiqué à l'équipe. Nous créons ou réutilisons votre accès automatiquement.
               </p>
               <a
                 href="mailto:coordinateur@campagne.fr"
@@ -241,7 +215,7 @@ const Auth = () => {
             </Button>
 
             <p className="text-base text-center text-muted-foreground">
-              Votre email doit être pré-enregistré par un coordinateur pour accéder à l'application
+              Astuce : gardez le code à portée de main, c'est le seul élément demandé pour vous connecter.
             </p>
           </form>
         </CardContent>
