@@ -227,55 +227,55 @@ const MapView = () => {
     if (!selectedCampaign) return;
 
     try {
-      // Get all campaign_segments for this campaign with their segments and streets
-      const { data: campaignSegments, error } = await supabase
-        .from("campaign_segments")
+      // First, get all streets with their segments
+      const { data: allStreets, error: streetsError } = await supabase
+        .from("streets")
         .select(`
           id,
-          status,
-          segment:segments (
+          name,
+          type,
+          coordinates,
+          segments (
             id,
             number_start,
-            number_end,
-            street:streets (
-              id,
-              name,
-              type,
-              coordinates
-            )
+            number_end
           )
+        `);
+
+      if (streetsError) throw streetsError;
+
+      // Then get campaign_segments for this campaign to get statuses
+      const { data: campaignSegments, error: campaignError } = await supabase
+        .from("campaign_segments")
+        .select(`
+          segment_id,
+          status
         `)
         .eq("campaign_id", selectedCampaign);
 
-      if (error) throw error;
+      if (campaignError) throw campaignError;
 
-      // Group by street
-      const streetsMap = new Map<string, StreetWithStatus>();
-      
+      // Create a map of segment_id to status
+      const segmentStatusMap = new Map<string, string>();
       (campaignSegments || []).forEach((cs: any) => {
-        if (!cs.segment?.street) return;
-        
-        const streetId = cs.segment.street.id;
-        
-        if (!streetsMap.has(streetId)) {
-          streetsMap.set(streetId, {
-            id: streetId,
-            name: cs.segment.street.name,
-            type: cs.segment.street.type,
-            coordinates: cs.segment.street.coordinates,
-            segments: [],
-          });
-        }
-        
-        streetsMap.get(streetId)!.segments.push({
-          id: cs.segment.id,
-          status: cs.status,
-          number_start: cs.segment.number_start,
-          number_end: cs.segment.number_end,
-        });
+        segmentStatusMap.set(cs.segment_id, cs.status);
       });
 
-      setStreets(Array.from(streetsMap.values()));
+      // Transform streets data
+      const streetsWithStatus: StreetWithStatus[] = (allStreets || []).map((street: any) => ({
+        id: street.id,
+        name: street.name,
+        type: street.type,
+        coordinates: street.coordinates,
+        segments: (street.segments || []).map((segment: any) => ({
+          id: segment.id,
+          number_start: segment.number_start,
+          number_end: segment.number_end,
+          status: segmentStatusMap.get(segment.id) || 'todo',
+        })),
+      }));
+
+      setStreets(streetsWithStatus);
     } catch (error: any) {
       console.error("Error fetching street statuses:", error);
       toast.error("Erreur lors du chargement des statuts");
