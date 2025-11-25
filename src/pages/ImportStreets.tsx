@@ -72,10 +72,17 @@ const ImportStreets = () => {
     }
   };
 
-  const extractCoordinates = (street: any): number[][] => {
-    // Extract coordinates from the geometry
-    if (street.geometry && Array.isArray(street.geometry)) {
-      return street.geometry.map((node: any) => [node.lat, node.lon]);
+  const extractCoordinates = (street: any, allElements: any[]): number[][] => {
+    // Extract coordinates from nodes referenced by the way
+    if (street.nodes && Array.isArray(street.nodes)) {
+      const coords: number[][] = [];
+      street.nodes.forEach((nodeId: number) => {
+        const node = allElements.find((el: any) => el.type === 'node' && el.id === nodeId);
+        if (node && node.lat && node.lon) {
+          coords.push([node.lat, node.lon]);
+        }
+      });
+      return coords;
     }
     return [];
   };
@@ -188,7 +195,7 @@ const ImportStreets = () => {
           skippedCount++;
         } else {
           // Insert street
-          const coordinates = extractCoordinates(street);
+          const coordinates = extractCoordinates(street, elements);
           
           const { data, error } = await supabase
             .from("streets")
