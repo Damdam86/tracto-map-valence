@@ -39,7 +39,7 @@ const ImportStreets = () => {
   };
 
   const fetchStreetsFromOverpass = async (): Promise<OverpassStreet[]> => {
-    // Requête Overpass API pour récupérer toutes les rues de Portes-lès-Valence avec les numéros
+    // Requête Overpass API pour récupérer toutes les rues de Portes-lès-Valence avec géométrie
     const query = `
       [out:json][timeout:60];
       area["name"="Portes-lès-Valence"]["admin_level"="8"]->.a;
@@ -47,7 +47,7 @@ const ImportStreets = () => {
         way["highway"]["name"](area.a);
         node["addr:housenumber"](area.a);
       );
-      out body;
+      out geom;
     `;
 
     const url = "https://overpass-api.de/api/interpreter";
@@ -70,6 +70,14 @@ const ImportStreets = () => {
     } catch (error) {
       throw error;
     }
+  };
+
+  const extractCoordinates = (street: any): number[][] => {
+    // Extract coordinates from the geometry
+    if (street.geometry && Array.isArray(street.geometry)) {
+      return street.geometry.map((node: any) => [node.lat, node.lon]);
+    }
+    return [];
   };
 
   const getStreetNumbers = (elements: any[], streetName: string): number[] => {
@@ -180,6 +188,8 @@ const ImportStreets = () => {
           skippedCount++;
         } else {
           // Insert street
+          const coordinates = extractCoordinates(street);
+          
           const { data, error } = await supabase
             .from("streets")
             .insert({
@@ -187,6 +197,7 @@ const ImportStreets = () => {
               type: getStreetType(streetType),
               district: "Importé",
               neighborhood: "OpenStreetMap",
+              coordinates: coordinates.length > 0 ? coordinates : null,
             })
             .select()
             .single();
