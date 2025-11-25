@@ -48,7 +48,7 @@ const MapView = () => {
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [streets, setStreets] = useState<StreetWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mapReady, setMapReady] = useState(0);
+  const [mapKey, setMapKey] = useState(0);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const polylinesRef = useRef<L.Polyline[]>([]);
@@ -66,28 +66,20 @@ const MapView = () => {
     }
   }, [selectedCampaign]);
 
-  // Force map reinitialization on every component mount
+  // Force map recreation on component mount by updating key
   useEffect(() => {
-    console.log('🔄 MapView mounted, triggering map initialization');
-    setMapReady(prev => prev + 1);
-    
-    return () => {
-      console.log('🧹 MapView unmounting, cleaning up map');
-    };
+    console.log('🔄 MapView mounted, forcing map recreation');
+    setMapKey(prev => prev + 1);
   }, []);
 
   useEffect(() => {
-    // Initialize map whenever mapReady changes (on every mount)
-    if (!mapContainerRef.current || mapReady === 0) return;
-    
-    console.log('🗺️ Initializing map (mapReady:', mapReady, ')');
-    
-    // Clean up any existing map first
-    if (mapRef.current) {
-      console.log('🧹 Removing existing map instance');
-      mapRef.current.remove();
-      mapRef.current = null;
+    // Initialize map
+    if (!mapContainerRef.current) {
+      console.log('⚠️ Map container not ready');
+      return;
     }
+    
+    console.log('🗺️ Creating new map instance (key:', mapKey, ')');
     
     // Create new map
     const map = L.map(mapContainerRef.current).setView(center, 14);
@@ -124,13 +116,13 @@ const MapView = () => {
 
     return () => {
       // Cleanup on unmount
+      console.log('🧹 Cleaning up map instance');
       if (mapRef.current) {
-        console.log('🧹 Cleaning up map on effect cleanup');
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, [mapReady]);
+  }, [mapKey]);
 
   useEffect(() => {
     // Update polylines when streets change
@@ -458,6 +450,7 @@ const MapView = () => {
             </div>
           </div>
           <div 
+            key={mapKey}
             ref={mapContainerRef}
             className="w-full h-[75vh] md:h-[calc(100vh-400px)] min-h-[500px] rounded-lg overflow-hidden border relative"
           >
