@@ -42,6 +42,16 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (resendTimer > 0) {
+      timer = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendTimer]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -50,8 +60,34 @@ const Auth = () => {
       return;
     }
 
-    return () => clearInterval(timer);
-  }, [resendTimer]);
+    setLoading(true);
+
+    try {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Se connecter avec le code OTP fourni
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: code,
+      });
+
+      if (signInError) {
+        toast.error("Code incorrect ou adresse email non reconnue");
+        setLoading(false);
+        return;
+      }
+
+      toast.success("Connexion réussie !");
+      navigate("/");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la connexion. Vérifiez votre connexion internet et réessayez."
+      );
+      setLoading(false);
+    }
+  };
 
   const sendOtp = async () => {
     const trimmedEmail = email.toLowerCase().trim();
@@ -101,16 +137,17 @@ const Auth = () => {
         }
       }
 
-      toast.success("Connexion réussie !");
-      navigate("/");
+      toast.success("Code envoyé !");
+      setOtpSent(true);
+      setResendTimer(60);
     } catch (error: unknown) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Erreur lors de la connexion. Vérifiez votre connexion internet et réessayez."
+          : "Erreur lors de l'envoi du code. Vérifiez votre connexion internet et réessayez."
       );
     } finally {
-      setLoading(false);
+      setIsSendingCode(false);
     }
   };
 
