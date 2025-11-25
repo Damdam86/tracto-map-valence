@@ -29,11 +29,12 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${existingStreets.length} streets in database`);
 
-    // Overpass query with expanded bounding box and all highway types
+    // Overpass query limited to the Portes-lès-Valence commune using INSEE code 26252
     const overpassQuery = `
       [out:json][timeout:120];
+      area["ref:INSEE"="26252"]->.searchArea;
       (
-        way["highway"]["name"](44.84,4.83,44.92,4.94);
+        way["highway"]["name"](area.searchArea);
       );
       out geom;
     `;
@@ -55,42 +56,52 @@ Deno.serve(async (req) => {
     let updatedCount = 0;
     let skippedCount = 0;
 
+    // Build a map of street name -> full merged geometry (all ways for that name)
+    const streetGeometries = new Map<string, number[][]>();
+
     for (const element of osmData.elements) {
       if (!element.tags?.name || !element.geometry) {
         continue;
       }
 
-      const streetName = element.tags.name;
-      
+      const streetName = element.tags.name as string;
+      const key = streetName.trim().toLowerCase();
+
       // Parse geometry - element.geometry is an array of {lat, lon}
       const coordinates = element.geometry.map((node: any) => [node.lat, node.lon]);
 
       if (coordinates.length === 0) {
-        console.log(`No coordinates for ${streetName}, skipping`);
+        console.log(`No coordinates for ${streetName}, skipping element`);
         skippedCount++;
         continue;
       }
 
-      // Find matching street in database
-      const matchingStreet = existingStreets.find(s => 
-        s.name.toLowerCase() === streetName.toLowerCase()
-      );
+      const existingCoords = streetGeometries.get(key) ?? [];
+      streetGeometries.set(key, [...existingCoords, ...coordinates]);
+    }
 
-      if (matchingStreet) {
-        // Update with full geometry
-        const { error: updateError } = await supabase
-          .from('streets')
-          .update({ coordinates })
-          .eq('id', matchingStreet.id);
+    console.log(`Built merged geometries for ${streetGeometries.size} distinct street names`);
 
-        if (updateError) {
-          console.error(`Error updating ${streetName}:`, updateError);
-        } else {
-          console.log(`✓ Updated ${streetName} with ${coordinates.length} points`);
-          updatedCount++;
-        }
-      } else {
+    // Now update existing streets using the merged geometries (case-insensitive match)
+    for (const s of existingStreets) {
+      const key = s.name.trim().toLowerCase();
+      const mergedCoords = streetGeometries.get(key);
+
+      if (!mergedCoords || mergedCoords.length === 0) {
         skippedCount++;
+        continue;
+      }
+
+      const { error: updateError } = await supabase
+        .from('streets')
+        .update({ coordinates: mergedCoords })
+        .eq('id', s.id);
+
+      if (updateError) {
+        console.error(`Error updating ${s.name}:`, updateError);
+      } else {
+        console.log(`✓ Updated ${s.name} with ${mergedCoords.length} points`);
+        updatedCount++;
       }
     }
 
