@@ -448,9 +448,27 @@ const Streets = () => {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-3 pt-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center mb-3">
                     <h4 className="text-sm font-medium">Segments</h4>
                     <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingStreet(street);
+                          setStreetFormData({
+                            name: street.name,
+                            type: street.type as any,
+                            district: street.district || "",
+                            neighborhood: street.neighborhood || "",
+                            district_id: street.district_id || "",
+                          });
+                          setStreetDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        Modifier la rue
+                      </Button>
                       <Dialog open={segmentDialogOpen} onOpenChange={setSegmentDialogOpen}>
                         <DialogTrigger asChild>
                           <Button
@@ -562,23 +580,6 @@ const Streets = () => {
                           </form>
                         </DialogContent>
                       </Dialog>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingStreet(street);
-                          setStreetFormData({
-                            name: street.name,
-                            type: street.type as any,
-                            district: street.district || "",
-                            neighborhood: street.neighborhood || "",
-                            district_id: street.district_id || "",
-                          });
-                          setStreetDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="w-3 h-3" />
-                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
