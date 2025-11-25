@@ -13,6 +13,8 @@ const ImportStreets = () => {
   const [imported, setImported] = useState(0);
   const [skipped, setSkipped] = useState(0);
   const [updated, setUpdated] = useState(0);
+  const [isUpdatingGeometries, setIsUpdatingGeometries] = useState(false);
+  const [geometriesUpdated, setGeometriesUpdated] = useState(0);
 
   const handleImport = async () => {
     setLoading(true);
@@ -84,6 +86,30 @@ const ImportStreets = () => {
       toast.error("Erreur lors de la mise à jour: " + (error?.message || "Erreur inconnue"));
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleUpdateGeometries = async () => {
+    try {
+      setIsUpdatingGeometries(true);
+      setGeometriesUpdated(0);
+      
+      toast.info("Mise à jour des géométries en cours...");
+
+      const { data, error } = await supabase.functions.invoke('update-street-geometries');
+
+      if (error) {
+        throw error;
+      }
+
+      setGeometriesUpdated(data.stats.updated);
+      toast.success(`${data.stats.updated} rues mises à jour avec leur géométrie complète!`);
+      
+    } catch (error: any) {
+      console.error('Error updating geometries:', error);
+      toast.error("Erreur lors de la mise à jour des géométries");
+    } finally {
+      setIsUpdatingGeometries(false);
     }
   };
 
@@ -221,6 +247,49 @@ const ImportStreets = () => {
           <p className="text-xs text-muted-foreground">
             Source de données: Base Adresse Nationale (BAN) - © IGN & DGFiP - Données officielles de l'État français
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mettre à jour les géométries complètes</CardTitle>
+          <CardDescription>
+            Force la mise à jour de toutes les rues avec leur tracé GPS complet depuis OpenStreetMap
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">
+              Cette action va récupérer les géométries complètes (tous les points GPS) 
+              pour chaque rue depuis OpenStreetMap et mettre à jour la base de données.
+            </p>
+            <Button 
+              onClick={handleUpdateGeometries} 
+              disabled={isUpdatingGeometries || loading || updating}
+              className="w-full sm:w-auto"
+            >
+              {isUpdatingGeometries ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Mise à jour en cours...
+                </>
+              ) : (
+                "Mettre à jour les géométries"
+              )}
+            </Button>
+          </div>
+
+          {geometriesUpdated > 0 && (
+            <div className="rounded-lg bg-muted p-4 space-y-2">
+              <p className="font-semibold">Résultats de la mise à jour :</p>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Rues mises à jour :</span>
+                  <span className="font-semibold text-primary">{geometriesUpdated}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
