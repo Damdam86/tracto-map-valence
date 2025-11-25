@@ -6,13 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { MapPin, Mail, CheckCircle2 } from "lucide-react";
+import { MapPin, Mail, Lock } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [code, setCode] = useState("");
 
   useEffect(() => {
     const checkSession = async () => {
@@ -33,13 +35,13 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleMagicLink = async (e: React.FormEvent) => {
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       // Check if email is pre-registered
-      const { data: invitation, error: inviteError } = await supabase
+      const { data: invitation } = await supabase
         .from("volunteer_invitations")
         .select("email")
         .eq("email", email.toLowerCase().trim())
@@ -54,56 +56,103 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          shouldCreateUser: false,
         },
       });
 
       if (error) throw error;
 
-      setEmailSent(true);
-      toast.success("Email envoyé ! Vérifiez votre boîte de réception.");
+      setCodeSent(true);
+      toast.success("Code envoyé à votre email !");
     } catch (error: any) {
-      toast.error(error.message || "Erreur lors de l'envoi de l'email");
+      toast.error(error.message || "Erreur lors de l'envoi du code");
     } finally {
       setLoading(false);
     }
   };
 
-  if (emailSent) {
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (code.length !== 6) {
+      toast.error("Le code doit contenir 6 chiffres");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.toLowerCase().trim(),
+        token: code,
+        type: 'email',
+      });
+
+      if (error) throw error;
+
+      toast.success("Connexion réussie !");
+      navigate("/");
+    } catch (error: any) {
+      toast.error("Code incorrect. Vérifiez votre email.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (codeSent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted to-background p-4">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="space-y-1 text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-3 bg-green-500 rounded-full">
-                <CheckCircle2 className="w-8 h-8 text-white" />
+              <div className="p-3 bg-primary rounded-full">
+                <Lock className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Email envoyé !</CardTitle>
+            <CardTitle className="text-2xl font-bold">Entrez votre code</CardTitle>
             <CardDescription className="text-base">
-              Nous avons envoyé un lien de connexion à <strong>{email}</strong>
+              Code à 6 chiffres envoyé à <strong>{email}</strong>
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted rounded-lg p-4 space-y-2 text-sm">
-              <p className="font-medium">📧 Vérifiez votre boîte de réception</p>
-              <p className="text-muted-foreground">
-                Cliquez sur le lien dans l'email pour vous connecter automatiquement.
+          <CardContent className="space-y-6">
+            <form onSubmit={handleVerifyCode} className="space-y-6">
+              <div className="flex justify-center">
+                <InputOTP
+                  maxLength={6}
+                  value={code}
+                  onChange={(value) => setCode(value)}
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              <Button type="submit" className="w-full h-12" disabled={loading || code.length !== 6}>
+                {loading ? "Vérification..." : "Se connecter"}
+              </Button>
+            </form>
+
+            <div className="text-center space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Vous n'avez pas reçu le code ?
               </p>
-              <p className="text-muted-foreground text-xs mt-3">
-                💡 Astuce : Si vous ne voyez pas l'email, vérifiez vos spams
-              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setCodeSent(false);
+                  setCode("");
+                }}
+              >
+                Renvoyer un code
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setEmailSent(false);
-                setEmail("");
-              }}
-            >
-              Renvoyer un email
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -125,7 +174,7 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleMagicLink} className="space-y-6">
+          <form onSubmit={handleSendCode} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-base">Votre adresse email</Label>
               <div className="relative">
@@ -145,11 +194,10 @@ const Auth = () => {
 
             <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
               <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                🔐 Connexion sans mot de passe
+                🔐 Connexion instantanée
               </p>
               <p className="text-xs text-blue-700 dark:text-blue-300">
-                Entrez votre email et nous vous enverrons un lien de connexion magique. 
-                Pas besoin de retenir un mot de passe !
+                Recevez un code à 6 chiffres par email et connectez-vous immédiatement.
               </p>
             </div>
 
@@ -159,7 +207,7 @@ const Auth = () => {
               ) : (
                 <>
                   <Mail className="w-5 h-5 mr-2" />
-                  Recevoir le lien de connexion
+                  Recevoir le code
                 </>
               )}
             </Button>
