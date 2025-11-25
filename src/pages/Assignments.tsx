@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { UserPlus, Users, MapPin, Target, CheckCircle2, Circle, AlertCircle, Clock } from "lucide-react";
+import { DistrictAssignment } from "@/components/DistrictAssignment";
 
 interface Campaign {
   id: string;
@@ -439,6 +440,20 @@ const Assignments = () => {
         </CardContent>
       </Card>
 
+      <Tabs defaultValue="segments" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="segments">
+            <Target className="w-4 h-4 mr-2" />
+            Par segments
+          </TabsTrigger>
+          <TabsTrigger value="districts">
+            <MapPin className="w-4 h-4 mr-2" />
+            Par quartiers
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="segments" className="space-y-4 mt-6">
+
       {!selectedCampaign ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -530,6 +545,26 @@ const Assignments = () => {
           ))}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="districts" className="mt-6">
+          {selectedCampaign ? (
+            <DistrictAssignment 
+              campaignId={selectedCampaign}
+              onAssignmentComplete={fetchCampaignSegments}
+            />
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <MapPin className="w-12 h-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium text-center">
+                  Sélectionnez une campagne
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent>

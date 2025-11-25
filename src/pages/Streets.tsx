@@ -18,6 +18,13 @@ interface Street {
   type: string;
   district: string;
   neighborhood: string;
+  district_id: string | null;
+}
+
+interface District {
+  id: string;
+  name: string;
+  color: string;
 }
 
 interface Segment {
@@ -32,6 +39,7 @@ interface Segment {
 
 const Streets = () => {
   const [streets, setStreets] = useState<Street[]>([]);
+  const [districts, setDistricts] = useState<District[]>([]);
   const [segments, setSegments] = useState<Record<string, Segment[]>>({});
   const [loading, setLoading] = useState(true);
   const [streetDialogOpen, setStreetDialogOpen] = useState(false);
@@ -48,6 +56,7 @@ const Streets = () => {
     type: "street" as "street" | "avenue" | "impasse" | "boulevard" | "place" | "chemin" | "route",
     district: "",
     neighborhood: "",
+    district_id: "",
   });
 
   const [segmentFormData, setSegmentFormData] = useState({
@@ -61,8 +70,23 @@ const Streets = () => {
 
   useEffect(() => {
     setLoading(true);
+    fetchDistricts();
     fetchStreets();
   }, [currentPage]);
+
+  const fetchDistricts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("districts")
+        .select("id, name, color")
+        .order("name");
+
+      if (error) throw error;
+      setDistricts(data || []);
+    } catch (error: any) {
+      toast.error("Erreur lors du chargement des quartiers");
+    }
+  };
 
   const fetchStreets = async () => {
     try {
@@ -111,10 +135,18 @@ const Streets = () => {
     e.preventDefault();
 
     try {
+      const streetData = {
+        name: streetFormData.name,
+        type: streetFormData.type,
+        district: streetFormData.district,
+        neighborhood: streetFormData.neighborhood,
+        district_id: streetFormData.district_id || null,
+      };
+
       if (editingStreet) {
         const { error } = await supabase
           .from("streets")
-          .update(streetFormData)
+          .update(streetData)
           .eq("id", editingStreet.id);
 
         if (error) throw error;
@@ -122,7 +154,7 @@ const Streets = () => {
       } else {
         const { error } = await supabase
           .from("streets")
-          .insert(streetFormData);
+          .insert(streetData);
 
         if (error) throw error;
         toast.success("Rue créée");
@@ -135,6 +167,7 @@ const Streets = () => {
         type: "street",
         district: "",
         neighborhood: "",
+        district_id: "",
       });
       fetchStreets();
     } catch (error: any) {
@@ -270,6 +303,7 @@ const Streets = () => {
                 type: "street",
                 district: "",
                 neighborhood: "",
+                district_id: "",
               });
             }}>
               <Plus className="w-4 h-4 mr-2" />
@@ -318,9 +352,35 @@ const Streets = () => {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="district_select">Quartier (cluster)</Label>
+                <Select
+                  value={streetFormData.district_id}
+                  onValueChange={(value) => setStreetFormData({ ...streetFormData, district_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionnez un quartier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucun quartier</SelectItem>
+                    {districts.map((district) => (
+                      <SelectItem key={district.id} value={district.id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="w-3 h-3 rounded-full inline-block"
+                            style={{ backgroundColor: district.color }}
+                          />
+                          {district.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="district">Quartier</Label>
+                  <Label htmlFor="district">Quartier (texte)</Label>
                   <Input
                     id="district"
                     value={streetFormData.district}
@@ -512,6 +572,7 @@ const Streets = () => {
                             type: street.type as any,
                             district: street.district || "",
                             neighborhood: street.neighborhood || "",
+                            district_id: street.district_id || "",
                           });
                           setStreetDialogOpen(true);
                         }}
