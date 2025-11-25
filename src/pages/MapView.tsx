@@ -66,13 +66,18 @@ const MapView = () => {
   }, [selectedCampaign]);
 
   useEffect(() => {
-    // Initialize map
-    if (mapContainerRef.current && !mapRef.current) {
-      mapRef.current = L.map(mapContainerRef.current).setView(center, 14);
+    // Initialize map only once
+    if (!mapContainerRef.current) return;
+    
+    if (!mapRef.current) {
+      // Create map
+      const map = L.map(mapContainerRef.current).setView(center, 14);
       
+      // Add tile layer
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(mapRef.current);
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(map);
       
       // Add info control
       const InfoControl = L.Control.extend({
@@ -87,10 +92,18 @@ const MapView = () => {
         }
       });
       
-      new InfoControl({ position: 'topright' }).addTo(mapRef.current);
+      new InfoControl({ position: 'topright' }).addTo(map);
+      
+      mapRef.current = map;
+      
+      // Force a resize to ensure tiles load properly
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 100);
     }
 
     return () => {
+      // Cleanup on unmount
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -100,39 +113,48 @@ const MapView = () => {
 
   useEffect(() => {
     // Update polylines when streets change
-    if (mapRef.current && streets.length > 0) {
-      // Remove old polylines
-      polylinesRef.current.forEach(polyline => {
-        mapRef.current?.removeLayer(polyline);
-      });
-      polylinesRef.current = [];
+    if (!mapRef.current || streets.length === 0) return;
 
-      // Count streets with coordinates
-      const streetsWithCoords = streets.filter(s => s.coordinates && s.coordinates.length > 0);
+    // Remove old polylines
+    polylinesRef.current.forEach(polyline => {
+      if (mapRef.current) {
+        mapRef.current.removeLayer(polyline);
+      }
+    });
+    polylinesRef.current = [];
+
+    // Count streets with coordinates
+    const streetsWithCoords = streets.filter(s => s.coordinates && Array.isArray(s.coordinates) && s.coordinates.length > 0);
+    
+    // Update info control
+    const infoContent = document.getElementById('info-content');
+    if (infoContent) {
+      const doneCount = streets.filter(s => getStreetStatus(s) === 'Terminé').length;
+      const inProgressCount = streets.filter(s => getStreetStatus(s) === 'En cours').length;
+      const todoCount = streets.filter(s => getStreetStatus(s) === 'À faire').length;
       
-      // Update info control
-      const infoContent = document.getElementById('info-content');
-      if (infoContent) {
-        const doneCount = streets.filter(s => getStreetStatus(s) === 'Terminé').length;
-        const inProgressCount = streets.filter(s => getStreetStatus(s) === 'En cours').length;
-        const todoCount = streets.filter(s => getStreetStatus(s) === 'À faire').length;
-        
-        infoContent.innerHTML = `
-          <strong>${streets.length} rues</strong><br/>
-          <span style="color: ${STATUS_COLORS.done}">● ${doneCount} terminées</span><br/>
-          <span style="color: ${STATUS_COLORS.in_progress}">● ${inProgressCount} en cours</span><br/>
-          <span style="color: ${STATUS_COLORS.todo}">● ${todoCount} à faire</span><br/>
-          ${streetsWithCoords.length < streets.length ? `<br/><small>${streets.length - streetsWithCoords.length} rue(s) sans coordonnées GPS</small>` : ''}
-        `;
-      }
+      infoContent.innerHTML = `
+        <strong>${streets.length} rues</strong><br/>
+        <span style="color: ${STATUS_COLORS.done}">● ${doneCount} terminées</span><br/>
+        <span style="color: ${STATUS_COLORS.in_progress}">● ${inProgressCount} en cours</span><br/>
+        <span style="color: ${STATUS_COLORS.todo}">● ${todoCount} à faire</span><br/>
+        ${streetsWithCoords.length < streets.length ? `<br/><small>${streets.length - streetsWithCoords.length} rue(s) sans coordonnées GPS</small>` : ''}
+      `;
+    }
 
-      if (streetsWithCoords.length === 0) {
-        console.log('Aucune rue avec coordonnées GPS à afficher');
-        return;
-      }
+    if (streetsWithCoords.length === 0) {
+      console.log('Aucune rue avec coordonnées GPS à afficher');
+      toast.info(`${streets.length} rue(s) trouvée(s), mais aucune n'a de coordonnées GPS. Utilisez l'import OpenStreetMap pour les obtenir.`);
+      return;
+    }
 
-      // Add new polylines
-      streetsWithCoords.forEach((street) => {
+    console.log(`Affichage de ${streetsWithCoords.length} rue(s) avec coordonnées sur la carte`);
+
+    // Add new polylines
+    streetsWithCoords.forEach((street) => {
+      if (!mapRef.current) return;
+      
+      try {
         // Convert coordinates to Leaflet format [lat, lng]
         const line: [number, number][] = street.coordinates!.map(coord => [coord[0], coord[1]]);
         
@@ -140,7 +162,7 @@ const MapView = () => {
           color: getStreetColor(street),
           weight: 5,
           opacity: 0.9,
-        }).addTo(mapRef.current!);
+        }).addTo(mapRef.current);
 
         // Calculate min and max numbers for this street
         const allNumbers = street.segments.flatMap(s => [s.number_start, s.number_end]);
@@ -153,12 +175,19 @@ const MapView = () => {
         );
 
         polylinesRef.current.push(polyline);
-      });
-      
-      // Fit bounds to show all streets
-      if (polylinesRef.current.length > 0) {
+      } catch (error) {
+        console.error(`Erreur lors de l'ajout de la rue ${street.name}:`, error);
+      }
+    });
+    
+    // Fit bounds to show all streets
+    if (polylinesRef.current.length > 0 && mapRef.current) {
+      try {
         const group = L.featureGroup(polylinesRef.current);
         mapRef.current.fitBounds(group.getBounds().pad(0.1));
+        console.log('Carte centrée sur les rues affichées');
+      } catch (error) {
+        console.error('Erreur lors du centrage de la carte:', error);
       }
     }
   }, [streets]);
