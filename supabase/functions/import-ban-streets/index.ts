@@ -203,12 +203,13 @@ Deno.serve(async (req) => {
     // Now fetch streets from OpenStreetMap to complement BAN data
     console.log('Fetching complementary streets from OpenStreetMap...')
     
+    // Bounding box for Portes-lès-Valence: [south, west, north, east]
+    // Approximate coordinates: lat 44.87, lon 4.88 with ~2km radius
     const overpassQuery = `
-      [out:json][timeout:60];
-      area["ISO3166-2"="FR-26"]["name"="Drôme"]->.a;
+      [out:json][timeout:90];
       (
-        way["highway"]["name"]["addr:city"="Portes-lès-Valence"](area.a);
-        way["highway"]["name"]["addr:postcode"="26800"](area.a);
+        way["highway"]["name"](44.85,4.85,44.89,4.91);
+        way["highway"]["name"]["highway"!="motorway"]["highway"!="motorway_link"]["highway"!="trunk"]["highway"!="trunk_link"](44.85,4.85,44.89,4.91);
       );
       out center;
     `
