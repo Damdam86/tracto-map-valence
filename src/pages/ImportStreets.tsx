@@ -87,7 +87,7 @@ const ImportStreets = () => {
     return numbers.sort((a, b) => a - b);
   };
 
-  const createSegments = (streetId: string, maxNumber: number): Array<{street_id: string, number_start: number, number_end: number, side: 'both' | 'even' | 'odd', building_type: 'mixed' | 'houses' | 'buildings'}> => {
+  const createSegmentsArray = (streetId: string, maxNumber: number): Array<{street_id: string, number_start: number, number_end: number, side: 'both' | 'even' | 'odd', building_type: 'mixed' | 'houses' | 'buildings'}> => {
     const segments = [];
     const segmentSize = 50;
     
@@ -161,10 +161,22 @@ const ImportStreets = () => {
         }
 
         let streetId: string;
+        let createSegments = false;
 
         // Check if already exists
         if (existingNames.has(streetName)) {
           streetId = existingNames.get(streetName)!;
+          
+          // Check if this street already has segments
+          const { data: existingSegments } = await supabase
+            .from("segments")
+            .select("id")
+            .eq("street_id", streetId);
+          
+          if (!existingSegments || existingSegments.length === 0) {
+            createSegments = true;
+          }
+          
           skippedCount++;
         } else {
           // Insert street
@@ -188,22 +200,26 @@ const ImportStreets = () => {
           streetId = data.id;
           importedCount++;
           existingNames.set(streetName, streetId);
+          createSegments = true;
         }
 
-        // Get house numbers for this street
-        const numbers = getStreetNumbers(elements, streetName);
-        const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 100; // Default to 100 if no numbers found
+        // Create segments if needed
+        if (createSegments) {
+          // Get house numbers for this street
+          const numbers = getStreetNumbers(elements, streetName);
+          const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 100; // Default to 100 if no numbers found
 
-        // Create segments
-        const segments = createSegments(streetId, maxNumber);
-        
-        // Insert segments
-        const { error: segError } = await supabase
-          .from("segments")
-          .insert(segments);
+          // Create segments
+          const segments = createSegmentsArray(streetId, maxNumber);
+          
+          // Insert segments
+          const { error: segError } = await supabase
+            .from("segments")
+            .insert(segments);
 
-        if (!segError) {
-          segmentsCreated += segments.length;
+          if (!segError) {
+            segmentsCreated += segments.length;
+          }
         }
 
         setImported(importedCount);
