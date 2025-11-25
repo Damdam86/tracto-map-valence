@@ -49,7 +49,9 @@ const ImportStreets = () => {
         way["highway"]["name"](area.a);
         node["addr:housenumber"](area.a);
       );
-      out geom;
+      out body;
+      >;
+      out skel qt;
     `;
 
     const url = "https://overpass-api.de/api/interpreter";
@@ -75,7 +77,14 @@ const ImportStreets = () => {
   };
 
   const extractCoordinates = (street: any, allElements: any[]): number[][] => {
-    // Extract coordinates from nodes referenced by the way
+    // If geometry is directly available (from out geom)
+    if (street.geometry && Array.isArray(street.geometry)) {
+      return street.geometry
+        .filter((g: any) => g.lat && g.lon)
+        .map((g: any) => [g.lat, g.lon]);
+    }
+    
+    // Otherwise, extract coordinates from nodes referenced by the way
     if (street.nodes && Array.isArray(street.nodes)) {
       const coords: number[][] = [];
       street.nodes.forEach((nodeId: number) => {
