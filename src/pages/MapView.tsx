@@ -251,14 +251,31 @@ const MapView = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Carte interactive</h1>
-        <p className="text-muted-foreground">
-          Visualisez l'avancement du tractage sur la carte
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Carte de suivi</h1>
+          <p className="text-muted-foreground">
+            Visualisez la progression du tractage en temps réel
+          </p>
+        </div>
+        <div className="w-full md:w-64">
+          <Label>Campagne</Label>
+          <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionnez une campagne" />
+            </SelectTrigger>
+            <SelectContent>
+              {campaigns.map((campaign) => (
+                <SelectItem key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Total rues</CardTitle>
@@ -305,62 +322,41 @@ const MapView = () => {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Campagne</CardTitle>
-          <CardDescription>Sélectionnez une campagne pour voir l'avancement</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label>Campagne</Label>
-            <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionnez une campagne" />
-              </SelectTrigger>
-              <SelectContent>
-                {campaigns.map((campaign) => (
-                  <SelectItem key={campaign.id} value={campaign.id}>
-                    {campaign.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
+      <Card className="col-span-full">
         <CardHeader>
           <CardTitle>Carte de Portes-lès-Valence</CardTitle>
-          <CardDescription>Légende des couleurs</CardDescription>
+          <CardDescription>Visualisation principale de la progression du tractage</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-4 mb-4">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 md:gap-4 mb-4 p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.todo }} />
-              <span className="text-xs">À faire</span>
+              <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: STATUS_COLORS.todo }} />
+              <span className="text-xs md:text-sm">À faire</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.in_progress }} />
-              <span className="text-xs">En cours</span>
+              <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: STATUS_COLORS.in_progress }} />
+              <span className="text-xs md:text-sm">En cours</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.done }} />
-              <span className="text-xs">Terminé</span>
+              <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: STATUS_COLORS.done }} />
+              <span className="text-xs md:text-sm">Terminé</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.redo }} />
-              <span className="text-xs">À refaire</span>
+              <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: STATUS_COLORS.redo }} />
+              <span className="text-xs md:text-sm">À refaire</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: STATUS_COLORS.mixed }} />
-              <span className="text-xs">Statut mixte</span>
+            <div className="flex items-center gap-2 col-span-2">
+              <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: STATUS_COLORS.mixed }} />
+              <span className="text-xs md:text-sm">Statut mixte</span>
             </div>
           </div>
           <div 
             ref={mapContainerRef}
-            className="w-full h-[600px] rounded-lg overflow-hidden border"
+            className="w-full h-[75vh] md:h-[calc(100vh-400px)] min-h-[500px] rounded-lg overflow-hidden border"
           />
+          <p className="text-xs md:text-sm text-muted-foreground mt-4">
+            Touchez/cliquez sur une rue pour voir son nom et sa progression
+          </p>
           <p className="text-sm text-muted-foreground mt-4">
             Note: Cette carte affiche des tracés simplifiés. Pour obtenir les coordonnées réelles des rues, 
             utilisez la fonction d'import depuis OpenStreetMap dans la page Rues & Segments.
