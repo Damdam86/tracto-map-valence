@@ -47,13 +47,17 @@ Deno.serve(async (req) => {
     
     // Parse CSV and filter for Portes-lès-Valence (code INSEE: 26252)
     const lines = csvData.split('\n')
-    const headers = lines[0].split(',')
+    const headers = lines[0].split(';') // BAN CSV uses semicolon separator
+    
+    console.log('CSV headers:', headers.slice(0, 10).join(', '))
     
     // Find column indices
     const nomVoieIdx = headers.indexOf('nom_voie')
     const codeInseeIdx = headers.indexOf('code_insee')
     const latIdx = headers.indexOf('lat')
     const lonIdx = headers.indexOf('lon')
+    
+    console.log('Column indices:', { nomVoieIdx, codeInseeIdx, latIdx, lonIdx })
     
     // Group addresses by street name
     const streetMap = new Map<string, { coords: number[][], numbers: number[] }>()
@@ -62,7 +66,7 @@ Deno.serve(async (req) => {
       const line = lines[i]
       if (!line.trim()) continue
       
-      const cols = line.split(',')
+      const cols = line.split(';') // BAN CSV uses semicolon separator
       const codeInsee = cols[codeInseeIdx]
       
       if (codeInsee === '26252') {
