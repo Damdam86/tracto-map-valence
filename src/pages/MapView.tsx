@@ -71,6 +71,21 @@ const MapView = () => {
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(mapRef.current);
+      
+      // Add info control
+      const InfoControl = L.Control.extend({
+        onAdd: function () {
+          const div = L.DomUtil.create('div', 'leaflet-control-info');
+          div.style.padding = '10px';
+          div.style.background = 'white';
+          div.style.borderRadius = '5px';
+          div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+          div.innerHTML = '<h4 style="margin: 0 0 5px 0;">Progression</h4><p id="info-content" style="margin: 0; font-size: 12px;">Sélectionnez une campagne</p>';
+          return div;
+        }
+      });
+      
+      new InfoControl({ position: 'topright' }).addTo(mapRef.current);
     }
 
     return () => {
@@ -90,20 +105,39 @@ const MapView = () => {
       });
       polylinesRef.current = [];
 
-      // Add new polylines
-      streets.forEach((street) => {
-        // Skip streets without coordinates
-        if (!street.coordinates || street.coordinates.length === 0) {
-          return;
-        }
+      // Count streets with coordinates
+      const streetsWithCoords = streets.filter(s => s.coordinates && s.coordinates.length > 0);
+      
+      // Update info control
+      const infoContent = document.getElementById('info-content');
+      if (infoContent) {
+        const doneCount = streets.filter(s => getStreetStatus(s) === 'Terminé').length;
+        const inProgressCount = streets.filter(s => getStreetStatus(s) === 'En cours').length;
+        const todoCount = streets.filter(s => getStreetStatus(s) === 'À faire').length;
+        
+        infoContent.innerHTML = `
+          <strong>${streets.length} rues</strong><br/>
+          <span style="color: ${STATUS_COLORS.done}">● ${doneCount} terminées</span><br/>
+          <span style="color: ${STATUS_COLORS.in_progress}">● ${inProgressCount} en cours</span><br/>
+          <span style="color: ${STATUS_COLORS.todo}">● ${todoCount} à faire</span><br/>
+          ${streetsWithCoords.length < streets.length ? `<br/><small>${streets.length - streetsWithCoords.length} rue(s) sans coordonnées GPS</small>` : ''}
+        `;
+      }
 
+      if (streetsWithCoords.length === 0) {
+        console.log('Aucune rue avec coordonnées GPS à afficher');
+        return;
+      }
+
+      // Add new polylines
+      streetsWithCoords.forEach((street) => {
         // Convert coordinates to Leaflet format [lat, lng]
-        const line: [number, number][] = street.coordinates.map(coord => [coord[0], coord[1]]);
+        const line: [number, number][] = street.coordinates!.map(coord => [coord[0], coord[1]]);
         
         const polyline = L.polyline(line, {
           color: getStreetColor(street),
-          weight: 4,
-          opacity: 0.8,
+          weight: 5,
+          opacity: 0.9,
         }).addTo(mapRef.current!);
 
         // Calculate min and max numbers for this street
@@ -118,6 +152,12 @@ const MapView = () => {
 
         polylinesRef.current.push(polyline);
       });
+      
+      // Fit bounds to show all streets
+      if (polylinesRef.current.length > 0) {
+        const group = L.featureGroup(polylinesRef.current);
+        mapRef.current.fitBounds(group.getBounds().pad(0.1));
+      }
     }
   }, [streets]);
 
@@ -357,8 +397,19 @@ const MapView = () => {
           </div>
           <div 
             ref={mapContainerRef}
-            className="w-full h-[75vh] md:h-[calc(100vh-400px)] min-h-[500px] rounded-lg overflow-hidden border"
-          />
+            className="w-full h-[75vh] md:h-[calc(100vh-400px)] min-h-[500px] rounded-lg overflow-hidden border relative"
+          >
+            {streets.length > 0 && streets.every(s => !s.coordinates || s.coordinates.length === 0) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/80 z-[1000] pointer-events-none">
+                <div className="bg-background p-6 rounded-lg shadow-lg text-center max-w-md">
+                  <p className="text-lg font-semibold mb-2">Coordonnées GPS manquantes</p>
+                  <p className="text-sm text-muted-foreground">
+                    Pour afficher les rues sur la carte, importez-les depuis OpenStreetMap dans la section "Import des rues"
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
           <p className="text-xs md:text-sm text-muted-foreground mt-4">
             Touchez/cliquez sur une rue pour voir son nom et sa progression
           </p>
