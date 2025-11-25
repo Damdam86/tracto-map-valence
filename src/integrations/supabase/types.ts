@@ -108,6 +108,33 @@ export type Database = {
         }
         Relationships: []
       }
+      districts: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -187,6 +214,7 @@ export type Database = {
           coordinates: Json | null
           created_at: string
           district: string | null
+          district_id: string | null
           id: string
           name: string
           neighborhood: string | null
@@ -197,6 +225,7 @@ export type Database = {
           coordinates?: Json | null
           created_at?: string
           district?: string | null
+          district_id?: string | null
           id?: string
           name: string
           neighborhood?: string | null
@@ -207,13 +236,22 @@ export type Database = {
           coordinates?: Json | null
           created_at?: string
           district?: string | null
+          district_id?: string | null
           id?: string
           name?: string
           neighborhood?: string | null
           type?: Database["public"]["Enums"]["street_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "streets_district_id_fkey"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "districts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_members: {
         Row: {
@@ -340,6 +378,42 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      volunteer_invitations: {
+        Row: {
+          accepted_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          invited_at: string
+          invited_by: string | null
+          last_name: string | null
+          phone: string | null
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          email: string
+          first_name?: string | null
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          last_name?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          last_name?: string | null
+          phone?: string | null
+          status?: string
         }
         Relationships: []
       }
