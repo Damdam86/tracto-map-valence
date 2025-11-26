@@ -16,54 +16,6 @@ const isInBounds = (lat: number, lon: number) => {
   return lat >= BBOX.minLat && lat <= BBOX.maxLat && lon >= BBOX.minLon && lon <= BBOX.maxLon;
 };
 
-const BBOX = {
-  minLat: 44.865,
-  maxLat: 44.885,
-  minLon: 4.865,
-  maxLon: 4.895
-}
-
-const isInBounds = (lat: number, lon: number) => {
-  return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
-         lon >= BBOX.minLon && lon <= BBOX.maxLon
-}
-
-const BBOX = {
-  minLat: 44.865,
-  maxLat: 44.885,
-  minLon: 4.865,
-  maxLon: 4.895
-}
-
-const isInBounds = (lat: number, lon: number) => {
-  return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
-         lon >= BBOX.minLon && lon <= BBOX.maxLon
-}
-
-const BBOX = {
-  minLat: 44.865,
-  maxLat: 44.885,
-  minLon: 4.865,
-  maxLon: 4.895
-}
-
-const isInBounds = (lat: number, lon: number) => {
-  return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
-         lon >= BBOX.minLon && lon <= BBOX.maxLon
-}
-
-const BBOX = {
-  minLat: 44.865,
-  maxLat: 44.885,
-  minLon: 4.865,
-  maxLon: 4.895
-}
-
-const isInBounds = (lat: number, lon: number) => {
-  return lat >= BBOX.minLat && lat <= BBOX.maxLat &&
-         lon >= BBOX.minLon && lon <= BBOX.maxLon
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
