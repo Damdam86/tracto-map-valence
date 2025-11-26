@@ -5,11 +5,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Bounding box for Portes-lès-Valence
+// Adjusted to include southern streets (Portes Sud) while excluding surrounding cities
 const BBOX = {
-  minLat: 44.865,
-  maxLat: 44.885,
-  minLon: 4.865,
-  maxLon: 4.895,
+  minLat: 44.860,
+  maxLat: 44.890,
+  minLon: 4.860,
+  maxLon: 4.900,
 };
 
 const isInBounds = (lat: number, lon: number) => {
