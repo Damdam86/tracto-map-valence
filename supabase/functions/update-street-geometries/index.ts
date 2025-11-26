@@ -86,17 +86,20 @@ Deno.serve(async (req) => {
       return coordinates.flatMap((segment: any) => Array.isArray(segment) ? segment.filter(isPoint) : []);
     };
 
-    // Clean existing out-of-bounds coordinates before updating
+    // Clean ALL existing out-of-bounds coordinates before updating
+    // This ensures we remove streets from other communes
     let cleanedCount = 0;
 
     for (const street of existingStreets) {
-      const points = extractPoints(street.coordinates);
+      if (!street.coordinates) continue;
 
+      const points = extractPoints(street.coordinates);
       if (points.length === 0) continue;
 
-      const hasInBoundsPoint = points.some((point) => isInBounds(point[0], point[1]));
+      // Check if ANY point is out of bounds - if so, clear all coordinates
+      const hasOutOfBoundsPoint = points.some((point) => !isInBounds(point[0], point[1]));
 
-      if (!hasInBoundsPoint) {
+      if (hasOutOfBoundsPoint) {
         const { error: cleanError } = await supabase
           .from('streets')
           .update({ coordinates: null })
@@ -105,10 +108,13 @@ Deno.serve(async (req) => {
         if (cleanError) {
           console.error(`Error clearing coordinates for ${street.name}:`, cleanError);
         } else {
+          console.log(`🧹 Cleaned out-of-bounds coordinates for ${street.name}`);
           cleanedCount++;
         }
       }
     }
+
+    console.log(`🧹 Cleaned ${cleanedCount} streets with out-of-bounds coordinates`);
 
     // Build a map of street name -> array of ways (each way is a separate segment)
     const streetGeometries = new Map<string, number[][][]>();
