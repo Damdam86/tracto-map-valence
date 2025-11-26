@@ -57,13 +57,13 @@ Deno.serve(async (req) => {
     let skippedCount = 0;
     let filteredCount = 0;
 
-    // Very strict bounding box for Portes-lès-Valence only
-    // These coordinates tightly fit the commune boundaries to exclude surrounding cities
+    // Bounding box for Portes-lès-Valence
+    // Adjusted to include southern streets (Portes Sud) while excluding surrounding cities
     const BBOX = {
-      minLat: 44.865,
-      maxLat: 44.885,
-      minLon: 4.865,
-      maxLon: 4.895,
+      minLat: 44.860,
+      maxLat: 44.890,
+      minLon: 4.860,
+      maxLon: 4.900,
     };
 
     // Function to check if a coordinate is within strict bounds
