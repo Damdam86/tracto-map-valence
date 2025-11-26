@@ -90,20 +90,22 @@ const Streets = () => {
 
   const fetchStreets = async () => {
     try {
-      // Get total count
+      // Get total count - only streets with coordinates (those in Portes-lès-Valence)
       const { count } = await supabase
         .from("streets")
-        .select("*", { count: 'exact', head: true });
+        .select("*", { count: 'exact', head: true })
+        .not('coordinates', 'is', null);
       
       setTotalCount(count || 0);
 
-      // Fetch paginated streets
+      // Fetch paginated streets - only with coordinates
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
       const { data, error } = await supabase
         .from("streets")
         .select("*")
+        .not('coordinates', 'is', null)
         .order("name")
         .range(from, to);
 

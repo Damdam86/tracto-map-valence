@@ -242,7 +242,7 @@ const MapView = () => {
     if (!selectedCampaign) return;
 
     try {
-      // First, get all streets with their segments
+      // First, get streets with coordinates (only those in Portes-lès-Valence) with their segments
       const { data: allStreets, error: streetsError } = await supabase
         .from("streets")
         .select(`
@@ -255,7 +255,8 @@ const MapView = () => {
             number_start,
             number_end
           )
-        `);
+        `)
+        .not('coordinates', 'is', null);
 
       if (streetsError) throw streetsError;
 
