@@ -7,91 +7,175 @@
 </head>
 
 <body>
-  <main>
-    <h1>Comité de soutien – Liste #Agir et Mieux Vivre 2026</h1>
-    <p>Élections municipales de mars 2026</p>
 
-    <form id="support-form">
+<main>
+  <h1>Comité de soutien – Liste #Agir et Mieux Vivre 2026</h1>
+  <p>Élections municipales de mars 2026</p>
 
-      <fieldset>
-        <legend>Identité</legend>
+  <form id="support-form">
 
-        <div>
-          <label for="last_name">Nom *</label><br>
-          <input type="text" id="last_name" name="last_name" required>
-        </div>
+    <fieldset>
+      <legend>Identité</legend>
 
-        <div>
-          <label for="first_name">Prénom *</label><br>
-          <input type="text" id="first_name" name="first_name" required>
-        </div>
-      </fieldset>
+      <div>
+        <label for="last_name">Nom *</label><br>
+        <input type="text" id="last_name" name="last_name" required>
+      </div>
 
-      <fieldset>
-        <legend>Coordonnées</legend>
+      <div>
+        <label for="first_name">Prénom *</label><br>
+        <input type="text" id="first_name" name="first_name" required>
+      </div>
+    </fieldset>
 
-        <div>
-          <label for="address">Adresse *</label><br>
-          <textarea id="address" name="address" rows="2" required></textarea>
-        </div>
+    <fieldset>
+      <legend>Coordonnées</legend>
 
-        <div>
-          <label for="phone">Téléphone *</label><br>
-          <input type="tel" id="phone" name="phone" required>
-        </div>
+      <div>
+        <label for="address">Adresse *</label><br>
+        <textarea id="address" name="address" rows="2" required></textarea>
+      </div>
 
-        <div>
-          <label for="email">Courriel *</label><br>
-          <input type="email" id="email" name="email" required>
-        </div>
-      </fieldset>
+      <div>
+        <label for="phone">Téléphone *</label><br>
+        <input type="tel" id="phone" name="phone" required>
+      </div>
 
-      <fieldset>
-        <legend>Engagement</legend>
+      <div>
+        <label for="email">Courriel *</label><br>
+        <input type="email" id="email" name="email" required>
+      </div>
+    </fieldset>
 
-        <p>
-          Je, soussigné(e), souhaite participer au Comité de soutien de la liste
-          <strong>#Agir et Mieux Vivre 2026</strong> pour les élections municipales de 2026.
-        </p>
+    <fieldset>
+      <legend>Engagement</legend>
 
-        <div>
-          <input type="checkbox" id="public_name" name="public_name" value="yes" required>
-          <label for="public_name">
-            Par ma signature, j'accepte de figurer sur la liste des membres du comité de soutien.
-            Seul mon nom y sera mentionné.
-          </label>
-        </div>
-      </fieldset>
+      <p>
+        Je, soussigné(e), souhaite participer au Comité de soutien de la liste
+        <strong>#Agir et Mieux Vivre 2026</strong> pour les élections municipales de 2026.
+      </p>
 
-      <fieldset>
-        <legend>Signature électronique</legend>
+      <div>
+        <input type="checkbox" id="public_name" name="public_name" value="yes" required>
+        <label for="public_name">
+          Par ma signature, j'accepte de figurer sur la liste des membres du comité de soutien.
+          Seul mon nom y sera mentionné.
+        </label>
+      </div>
+    </fieldset>
 
-        <p>En saisissant votre nom ci-dessous, vous validez votre engagement et votre identité.</p>
+    <fieldset>
+      <legend>Signature électronique</legend>
 
-        <div>
-          <label for="signature">Signature (Nom / Prénom) *</label><br>
-          <input type="text" id="signature" name="signature" required>
-        </div>
-      </fieldset>
+      <p>En saisissant votre nom ci-dessous, vous validez votre engagement et votre identité.</p>
 
-      <fieldset>
-        <legend>Mentions RGPD</legend>
-        <p>
-          Les informations recueillies sont nécessaires à la gestion du comité de soutien de la liste
-          #Agir et Mieux Vivre 2026. Conformément au RGPD, vous pouvez exercer vos droits
-          (accès, rectification, suppression) en écrivant à : <strong>[adresse email de contact]</strong>.
-        </p>
+      <div>
+        <label for="signature">Signature (Nom / Prénom) *</label><br>
+        <input type="text" id="signature" name="signature" required>
+      </div>
+    </fieldset>
 
-        <div>
-          <input type="checkbox" id="rgpd_ok" name="rgpd_ok" value="yes" required>
-          <label for="rgpd_ok">J’accepte le traitement de mes données conformément au RGPD.</label>
-        </div>
-      </fieldset>
+    <fieldset>
+      <legend>Mentions RGPD</legend>
 
-      <button type="submit">Envoyer</button>
-    </form>
+      <p>
+        Les informations recueillies sont nécessaires à la gestion du comité de soutien de la liste
+        #Agir et Mieux Vivre 2026. Conformément au RGPD, vous pouvez exercer vos droits
+        (accès, rectification, suppression) en écrivant à :
+        <strong>[adresse email de contact]</strong>.
+      </p>
 
-    <p id="status"></p>
-  </main>
+      <div>
+        <input type="checkbox" id="rgpd_ok" name="rgpd_ok" value="yes" required>
+        <label for="rgpd_ok">J’accepte le traitement de mes données conformément au RGPD.</label>
+      </div>
+    </fieldset>
+
+    <button type="submit">Envoyer</button>
+  </form>
+
+  <p id="status"></p>
+</main>
+
+<!-- SUPABASE + LOGIQUE -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+
+  // --------------------------------------------------------
+  // 🔧 CONFIG À REMPLACER
+  // --------------------------------------------------------
+  const SUPABASE_URL = "https://xxxxx.supabase.co";   // ← Ton URL Supabase
+  const SUPABASE_ANON_KEY = "xxxxx";                 // ← Clé anon publique
+  const FUNCTION_URL =
+    "https://xxxxx.functions.supabase.co/support-notify"; // ← URL de ta Edge Function
+
+
+  // --------------------------------------------------------
+  // 🔌 INITIALISATION
+  // --------------------------------------------------------
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const form = document.getElementById("support-form");
+  const statusEl = document.getElementById("status");
+
+
+  // --------------------------------------------------------
+  // 📤 TRAITEMENT DU FORMULAIRE
+  // --------------------------------------------------------
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    statusEl.textContent = "Enregistrement...";
+
+    const formData = new FormData(form);
+
+    const payload = {
+      last_name: formData.get("last_name"),
+      first_name: formData.get("first_name"),
+      address: formData.get("address"),
+      phone: formData.get("phone"),
+      email: formData.get("email"),
+      public_name: formData.get("public_name") === "yes",
+      signature: formData.get("signature"),
+    };
+
+    // ----------------------------------------------
+    // 1️⃣ INSERTION DANS SUPABASE
+    // ----------------------------------------------
+    const { error } = await supabase
+      .from("support_committee_members")
+      .insert(payload);
+
+    if (error) {
+      console.error(error);
+      statusEl.textContent =
+        "❌ Erreur lors de l’enregistrement. Merci de réessayer.";
+      return;
+    }
+
+    // ----------------------------------------------
+    // 2️⃣ ENVOI EMAIL VIA EDGE FUNCTION
+    // ----------------------------------------------
+    const res = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.error(await res.text());
+      statusEl.textContent =
+        "⚠️ Enregistré, mais l'email de notification n'a pas pu être envoyé.";
+      return;
+    }
+
+    // ----------------------------------------------
+    // ✔️ SUCCÈS
+    // ----------------------------------------------
+    statusEl.textContent = "🎉 Merci ! Votre soutien a bien été enregistré.";
+    form.reset();
+  });
+</script>
+
 </body>
 </html>
