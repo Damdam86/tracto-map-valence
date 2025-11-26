@@ -1,165 +1,97 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Formulaire - Comité de soutien</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Tu pourras ajouter ici ton propre CSS (fichier externe ou <style> interne) -->
+  <meta charset="UTF-8">
+  <title>Comité de soutien – #Agir et Mieux Vivre 2026</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+
 <body>
-    <main>
-        <h1>Rejoindre le comité de soutien</h1>
+  <main>
+    <h1>Comité de soutien – Liste #Agir et Mieux Vivre 2026</h1>
+    <p>Élections municipales de mars 2026</p>
+
+    <form id="support-form">
+
+      <fieldset>
+        <legend>Identité</legend>
+
+        <div>
+          <label for="last_name">Nom *</label><br>
+          <input type="text" id="last_name" name="last_name" required>
+        </div>
+
+        <div>
+          <label for="first_name">Prénom *</label><br>
+          <input type="text" id="first_name" name="first_name" required>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Coordonnées</legend>
+
+        <div>
+          <label for="address">Adresse *</label><br>
+          <textarea id="address" name="address" rows="2" required></textarea>
+        </div>
+
+        <div>
+          <label for="phone">Téléphone *</label><br>
+          <input type="tel" id="phone" name="phone" required>
+        </div>
+
+        <div>
+          <label for="email">Courriel *</label><br>
+          <input type="email" id="email" name="email" required>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Engagement</legend>
 
         <p>
-            En remplissant ce formulaire, vous rejoignez le comité de soutien de la liste
-            <strong>[Nom de la liste / candidat]</strong> pour les élections municipales de
-            <strong>[année]</strong>.
+          Je, soussigné(e), souhaite participer au Comité de soutien de la liste
+          <strong>#Agir et Mieux Vivre 2026</strong> pour les élections municipales de 2026.
         </p>
 
-        <form action="/submit-support-committee" method="post">
-            <!-- Identité -->
-            <fieldset>
-                <legend>Votre identité</legend>
+        <div>
+          <input type="checkbox" id="public_name" name="public_name" value="yes" required>
+          <label for="public_name">
+            Par ma signature, j'accepte de figurer sur la liste des membres du comité de soutien.
+            Seul mon nom y sera mentionné.
+          </label>
+        </div>
+      </fieldset>
 
-                <div>
-                    <label for="last_name">Nom <span aria-hidden="true">*</span></label><br>
-                    <input type="text" id="last_name" name="last_name" required>
-                </div>
+      <fieldset>
+        <legend>Signature électronique</legend>
 
-                <div>
-                    <label for="first_name">Prénom <span aria-hidden="true">*</span></label><br>
-                    <input type="text" id="first_name" name="first_name" required>
-                </div>
+        <p>En saisissant votre nom ci-dessous, vous validez votre engagement et votre identité.</p>
 
-                <div>
-                    <label for="email">Adresse e-mail <span aria-hidden="true">*</span></label><br>
-                    <input type="email" id="email" name="email" required>
-                </div>
+        <div>
+          <label for="signature">Signature (Nom / Prénom) *</label><br>
+          <input type="text" id="signature" name="signature" required>
+        </div>
+      </fieldset>
 
-                <div>
-                    <label for="phone">Téléphone (facultatif)</label><br>
-                    <input type="tel" id="phone" name="phone">
-                </div>
+      <fieldset>
+        <legend>Mentions RGPD</legend>
+        <p>
+          Les informations recueillies sont nécessaires à la gestion du comité de soutien de la liste
+          #Agir et Mieux Vivre 2026. Conformément au RGPD, vous pouvez exercer vos droits
+          (accès, rectification, suppression) en écrivant à : <strong>[adresse email de contact]</strong>.
+        </p>
 
-                <div>
-                    <label for="city">Commune (facultatif)</label><br>
-                    <input type="text" id="city" name="city">
-                </div>
-            </fieldset>
+        <div>
+          <input type="checkbox" id="rgpd_ok" name="rgpd_ok" value="yes" required>
+          <label for="rgpd_ok">J’accepte le traitement de mes données conformément au RGPD.</label>
+        </div>
+      </fieldset>
 
-            <!-- Engagements -->
-            <fieldset>
-                <legend>Votre engagement</legend>
+      <button type="submit">Envoyer</button>
+    </form>
 
-                <div>
-                    <input type="checkbox" id="join_committee" name="join_committee" value="yes" required>
-                    <label for="join_committee">
-                        Je souhaite rejoindre le comité de soutien de la liste
-                        <strong>[Nom de la liste / candidat]</strong>.
-                    </label>
-                </div>
-
-                <div>
-                    <input type="checkbox" id="public_name" name="public_name" value="yes">
-                    <label for="public_name">
-                        J’accepte que mon nom et mon prénom puissent être cités publiquement
-                        (site internet, documents de campagne, réseaux sociaux, etc.) en tant que
-                        membre du comité de soutien.
-                    </label>
-                </div>
-
-                <div>
-                    <input type="checkbox" id="newsletter" name="newsletter" value="yes">
-                    <label for="newsletter">
-                        J’accepte de recevoir des informations sur la campagne
-                        (actualités, réunions publiques, événements, etc.).
-                    </label>
-                </div>
-            </fieldset>
-
-            <!-- Message de soutien -->
-            <fieldset>
-                <legend>Message de soutien (facultatif)</legend>
-
-                <div>
-                    <label for="support_message">Vous pouvez laisser un message de soutien :</label><br>
-                    <textarea id="support_message" name="support_message" rows="4"></textarea>
-                </div>
-            </fieldset>
-
-            <!-- Signature -->
-            <fieldset>
-                <legend>Signature</legend>
-
-                <p>
-                    En indiquant votre nom ci-dessous, vous signez électroniquement ce formulaire
-                    et confirmez être l’auteur de cette déclaration.
-                </p>
-
-                <div>
-                    <label for="signature">Signature (tapez votre nom) <span aria-hidden="true">*</span></label><br>
-                    <input type="text" id="signature" name="signature" required>
-                </div>
-
-                <div>
-                    <input type="checkbox" id="certify" name="certify" value="yes" required>
-                    <label for="certify">
-                        Je certifie l’exactitude des informations communiquées et le fait que je remplis
-                        ce formulaire en mon nom propre.
-                    </label>
-                </div>
-            </fieldset>
-
-            <!-- Consentement RGPD -->
-            <fieldset>
-                <legend>Données personnelles</legend>
-
-                <p>
-                    Les informations recueillies dans ce formulaire sont enregistrées par
-                    <strong>[Nom du responsable de traitement / association de campagne]</strong>
-                    afin de gérer le comité de soutien de la liste
-                    <strong>[Nom de la liste / candidat]</strong> pour les élections municipales de
-                    <strong>[année]</strong>.
-                </p>
-
-                <ul>
-                    <li>
-                        <strong>Finalité :</strong> gestion du comité de soutien, envoi d’informations
-                        liées à la campagne, organisation d’événements.
-                    </li>
-                    <li>
-                        <strong>Base légale :</strong> votre consentement.
-                    </li>
-                    <li>
-                        <strong>Données rendues publiques :</strong> uniquement votre nom et prénom,
-                        et uniquement si vous cochez la case prévue à cet effet ci-dessus.
-                    </li>
-                    <li>
-                        <strong>Durée de conservation :</strong> jusqu’à la fin de la campagne électorale,
-                        puis au maximum <strong>[durée à préciser, ex. 6 mois]</strong> pour la clôture et
-                        l’archivage interne.
-                    </li>
-                    <li>
-                        <strong>Vos droits :</strong> vous pouvez à tout moment demander l’accès, la
-                        rectification, l’effacement de vos données ou le retrait de votre consentement,
-                        en écrivant à <strong>[adresse e-mail de contact / DPO]</strong>.
-                    </li>
-                </ul>
-
-                <div>
-                    <input type="checkbox" id="rgpd_ok" name="rgpd_ok" value="yes" required>
-                    <label for="rgpd_ok">
-                        Je reconnais avoir pris connaissance des informations ci-dessus relatives
-                        au traitement de mes données personnelles.
-                    </label>
-                </div>
-            </fieldset>
-
-            <!-- Bouton d'envoi -->
-            <div>
-                <button type="submit">Valider mon soutien</button>
-            </div>
-        </form>
-    </main>
+    <p id="status"></p>
+  </main>
 </body>
 </html>
