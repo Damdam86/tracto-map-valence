@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Mail, CheckCircle2, Clock, Trash2 } from "lucide-react";
+import logo from "@/assets/agir_mieux_vivre.jpg";
 import {
   Dialog,
   DialogContent,
@@ -123,11 +124,14 @@ const Invitations = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Invitations Bénévoles</h1>
-          <p className="text-muted-foreground">
-            Pré-enregistrez les emails des bénévoles pour leur permettre de se connecter
-          </p>
+        <div className="flex items-center gap-4">
+          <img src={logo} alt="Agir et Mieux Vivre 2026" className="h-20 w-20 object-contain" />
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Invitations Bénévoles</h1>
+            <p className="text-muted-foreground">
+              Pré-enregistrez les emails des bénévoles pour leur permettre de se connecter
+            </p>
+          </div>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
