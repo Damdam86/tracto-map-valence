@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Mail } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/agir_mieux_vivre.jpg";
 import { useTextSize } from "@/hooks/useTextSize";
 
 const FIXED_CODE = "123456"; // Code fixe pour tous les utilisateurs
