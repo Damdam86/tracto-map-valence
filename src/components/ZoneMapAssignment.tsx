@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Check, MapPin, RefreshCw } from "lucide-react";
+import { Check, MapPin, RefreshCw, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -18,12 +20,22 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
+interface Segment {
+  id: string;
+  street_id: string;
+  number_start: number;
+  number_end: number;
+  side: string;
+  building_type: string;
+  district_id: string | null;
+}
+
 interface Street {
   id: string;
   name: string;
   type: string;
-  district_id: string | null;
   coordinates: number[][] | number[][][] | null;
+  segments: Segment[];
 }
 
 interface District {
@@ -32,19 +44,21 @@ interface District {
   color: string;
 }
 
-const UNASSIGNED_COLOR = "#94a3b8"; // Gray for unassigned streets
-const SELECTED_COLOR = "#facc15"; // Yellow for selected streets
+const UNASSIGNED_COLOR = "#94a3b8";
+const SELECTED_COLOR = "#facc15";
+const MIXED_COLOR = "#8b5cf6";
 
 const ZoneMapAssignment = () => {
   const [streets, setStreets] = useState<Street[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
-  const [selectedStreets, setSelectedStreets] = useState<Set<string>>(new Set());
+  const [selectedSegments, setSelectedSegments] = useState<Set<string>>(new Set());
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
+  const [selectedStreetForSegments, setSelectedStreetForSegments] = useState<Street | null>(null);
   const [loading, setLoading] = useState(true);
   const mapRef = useRef<L.Map | null>(null);
-  const polylinesRef = useRef<Map<string, L.Polyline[]>>(new Map()); // Map street ID to polylines
+  const polylinesRef = useRef<Map<string, L.Polyline[]>>(new Map());
 
-  const center: [number, number] = [44.8771, 4.8772]; // Portes-lès-Valence
+  const center: [number, number] = [44.8771, 4.8772];
   const defaultZoom = 15;
 
   const mapContainerRef = useCallback((node: HTMLDivElement | null) => {
@@ -68,7 +82,6 @@ const ZoneMapAssignment = () => {
       maxZoom: 19
     }).addTo(map);
 
-    // Add info control
     const InfoControl = L.Control.extend({
       onAdd: function () {
         const div = L.DomUtil.create('div', 'leaflet-control-info');
@@ -76,13 +89,12 @@ const ZoneMapAssignment = () => {
         div.style.background = 'white';
         div.style.borderRadius = '5px';
         div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-        div.innerHTML = '<h4 style="margin: 0 0 5px 0;">Sélection</h4><p id="info-content" style="margin: 0; font-size: 12px;">Cliquez sur les rues pour les sélectionner</p>';
+        div.innerHTML = '<h4 style="margin: 0 0 5px 0;">Sélection</h4><p id="info-content" style="margin: 0; font-size: 12px;">Cliquez sur une rue pour voir ses segments</p>';
         return div;
       }
     });
 
     new InfoControl({ position: 'topright' }).addTo(map);
-
     mapRef.current = map;
 
     setTimeout(() => {
@@ -97,20 +109,32 @@ const ZoneMapAssignment = () => {
   useEffect(() => {
     if (!mapRef.current || streets.length === 0) return;
     renderStreets();
-  }, [streets, selectedStreets, districts]); // Added districts to dependencies
+  }, [streets, selectedSegments, districts]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // First check total streets count
       const { count: totalStreets } = await supabase
         .from("streets")
         .select("*", { count: 'exact', head: true });
 
-      // Fetch all streets with coordinates
       const { data: streetsData, error: streetsError } = await supabase
         .from("streets")
-        .select("id, name, type, district_id, coordinates")
+        .select(`
+          id,
+          name,
+          type,
+          coordinates,
+          segments (
+            id,
+            street_id,
+            number_start,
+            number_end,
+            side,
+            building_type,
+            district_id
+          )
+        `)
         .not('coordinates', 'is', null)
         .order("name");
 
@@ -120,17 +144,12 @@ const ZoneMapAssignment = () => {
 
       if (!streetsData || streetsData.length === 0) {
         if (totalStreets && totalStreets > 0) {
-          toast.info(`Aucune rue avec coordonnées GPS trouvée. Utilisez "Import rues" pour importer les coordonnées depuis OpenStreetMap.`, {
-            duration: 5000,
-          });
-        } else {
-          toast.info("Aucune rue trouvée dans la base de données.");
+          toast.info(`Aucune rue avec coordonnées GPS trouvée.`, { duration: 5000 });
         }
       }
 
-      setStreets(streetsData || []);
+      setStreets(streetsData as any || []);
 
-      // Fetch districts
       const { data: districtsData, error: districtsError } = await supabase
         .from("districts")
         .select("id, name, color")
@@ -146,12 +165,25 @@ const ZoneMapAssignment = () => {
     }
   };
 
+  const getStreetColor = (street: Street) => {
+    if (!street.segments || street.segments.length === 0) return UNASSIGNED_COLOR;
+
+    const zones = new Set(street.segments.map(s => s.district_id).filter(Boolean));
+
+    if (zones.size === 0) return UNASSIGNED_COLOR;
+    if (zones.size === 1) {
+      const zoneId = Array.from(zones)[0];
+      const district = districts.find(d => d.id === zoneId);
+      return district?.color || UNASSIGNED_COLOR;
+    }
+    return MIXED_COLOR;
+  };
+
   const renderStreets = () => {
     if (!mapRef.current) return;
 
     console.log(`🗺️ Rendering ${streets.length} streets on map`);
 
-    // Remove all existing polylines
     polylinesRef.current.forEach((polylines) => {
       polylines.forEach(p => {
         if (mapRef.current) {
@@ -161,48 +193,40 @@ const ZoneMapAssignment = () => {
     });
     polylinesRef.current.clear();
 
-    // Update info control
     const infoContent = document.getElementById('info-content');
     if (infoContent) {
-      const assignedCount = streets.filter(s => s.district_id).length;
-      const unassignedCount = streets.filter(s => !s.district_id).length;
+      const totalSegments = streets.reduce((sum, s) => sum + (s.segments?.length || 0), 0);
+      const assignedSegments = streets.reduce((sum, s) =>
+        sum + (s.segments?.filter(seg => seg.district_id)?.length || 0), 0);
 
       infoContent.innerHTML = `
-        <strong>${streets.length} rues</strong><br/>
-        <span style="color: #22c55e">● ${assignedCount} assignées</span><br/>
-        <span style="color: ${UNASSIGNED_COLOR}">● ${unassignedCount} non assignées</span><br/>
-        ${selectedStreets.size > 0 ? `<br/><strong style="color: ${SELECTED_COLOR}">● ${selectedStreets.size} sélectionnée(s)</strong>` : ''}
+        <strong>${streets.length} rues • ${totalSegments} segments</strong><br/>
+        <span style="color: #22c55e">● ${assignedSegments} segments assignés</span><br/>
+        ${selectedSegments.size > 0 ? `<br/><strong style="color: ${SELECTED_COLOR}">● ${selectedSegments.size} segment(s) sélectionné(s)</strong>` : ''}
       `;
     }
 
     const allPolylines: L.Polyline[] = [];
-    let renderedCount = 0;
-    let errorCount = 0;
 
     streets.forEach((street) => {
-      if (!mapRef.current || !street.coordinates) {
-        if (!street.coordinates) {
-          console.warn(`⚠️ Street "${street.name}" has no coordinates`);
-        }
-        return;
-      }
+      if (!mapRef.current || !street.coordinates) return;
 
       try {
         const coords = street.coordinates;
         const isMultiLineString = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
 
-        const isSelected = selectedStreets.has(street.id);
-        const district = districts.find(d => d.id === street.district_id);
-        const color = isSelected ? SELECTED_COLOR : (district?.color || UNASSIGNED_COLOR);
+        const hasSelectedSegments = street.segments?.some(seg => selectedSegments.has(seg.id));
+        const color = hasSelectedSegments ? SELECTED_COLOR : getStreetColor(street);
 
         const polylineOptions = {
           color,
-          weight: isSelected ? 7 : 5,
-          opacity: isSelected ? 1 : 0.7,
+          weight: hasSelectedSegments ? 7 : 5,
+          opacity: hasSelectedSegments ? 1 : 0.7,
         };
 
-        const zoneName = district?.name || "Non assignée";
-        const tooltipText = `<strong>${street.name}</strong><br/>Zone: ${zoneName}${isSelected ? '<br/><em>Sélectionnée</em>' : ''}`;
+        const segmentCount = street.segments?.length || 0;
+        const assignedCount = street.segments?.filter(s => s.district_id)?.length || 0;
+        const tooltipText = `<strong>${street.name}</strong><br/>${segmentCount} segment(s) • ${assignedCount} assigné(s)<br/><em>Cliquez pour voir les segments</em>`;
 
         const streetPolylines: L.Polyline[] = [];
 
@@ -213,10 +237,9 @@ const ZoneMapAssignment = () => {
             const polyline = L.polyline(line, polylineOptions).addTo(mapRef.current!);
             polyline.bindTooltip(tooltipText, { direction: 'top' });
 
-            // Add click event
             polyline.on('click', (e) => {
               L.DomEvent.stopPropagation(e);
-              toggleStreetSelection(street.id, e.originalEvent as MouseEvent);
+              handleStreetClick(street);
             });
 
             streetPolylines.push(polyline);
@@ -229,7 +252,7 @@ const ZoneMapAssignment = () => {
 
           polyline.on('click', (e) => {
             L.DomEvent.stopPropagation(e);
-            toggleStreetSelection(street.id, e.originalEvent as MouseEvent);
+            handleStreetClick(street);
           });
 
           streetPolylines.push(polyline);
@@ -237,55 +260,50 @@ const ZoneMapAssignment = () => {
         }
 
         polylinesRef.current.set(street.id, streetPolylines);
-        renderedCount++;
       } catch (error) {
-        console.error(`❌ Erreur lors de l'ajout de la rue ${street.name}:`, error);
-        errorCount++;
+        console.error(`❌ Error adding street ${street.name}:`, error);
       }
     });
 
-    console.log(`✅ Rendered ${renderedCount} streets, ${errorCount} errors, ${allPolylines.length} total polylines`);
-
-    // Fit bounds to show all streets
     if (allPolylines.length > 0 && mapRef.current) {
       try {
         const group = L.featureGroup(allPolylines);
         mapRef.current.fitBounds(group.getBounds().pad(0.1));
-        console.log(`📍 Map centered on ${allPolylines.length} polylines`);
       } catch (error) {
-        console.error('❌ Erreur lors du centrage de la carte:', error);
+        console.error('❌ Error centering map:', error);
       }
-    } else {
-      console.warn(`⚠️ No polylines to display on map (streets: ${streets.length}, allPolylines: ${allPolylines.length})`);
     }
   };
 
-  const toggleStreetSelection = (streetId: string, event: MouseEvent) => {
-    const newSelection = new Set(selectedStreets);
+  const handleStreetClick = (street: Street) => {
+    setSelectedStreetForSegments(street);
+  };
 
-    if (event.ctrlKey || event.metaKey) {
-      // CTRL/CMD+Click: Toggle individual selection
-      if (newSelection.has(streetId)) {
-        newSelection.delete(streetId);
-      } else {
-        newSelection.add(streetId);
-      }
+  const toggleSegment = (segmentId: string) => {
+    const newSelection = new Set(selectedSegments);
+    if (newSelection.has(segmentId)) {
+      newSelection.delete(segmentId);
     } else {
-      // Regular click: Select only this one
-      if (newSelection.has(streetId) && newSelection.size === 1) {
-        newSelection.clear();
-      } else {
-        newSelection.clear();
-        newSelection.add(streetId);
-      }
+      newSelection.add(segmentId);
     }
+    setSelectedSegments(newSelection);
+  };
 
-    setSelectedStreets(newSelection);
+  const selectAllSegmentsInStreet = (street: Street) => {
+    const newSelection = new Set(selectedSegments);
+    street.segments?.forEach(seg => newSelection.add(seg.id));
+    setSelectedSegments(newSelection);
+  };
+
+  const deselectAllSegmentsInStreet = (street: Street) => {
+    const newSelection = new Set(selectedSegments);
+    street.segments?.forEach(seg => newSelection.delete(seg.id));
+    setSelectedSegments(newSelection);
   };
 
   const handleBulkAssign = async () => {
-    if (selectedStreets.size === 0) {
-      toast.error("Veuillez sélectionner au moins une rue");
+    if (selectedSegments.size === 0) {
+      toast.error("Veuillez sélectionner au moins un segment");
       return;
     }
 
@@ -295,40 +313,67 @@ const ZoneMapAssignment = () => {
     }
 
     try {
-      const updates = Array.from(selectedStreets).map((streetId) => ({
-        id: streetId,
+      const updates = Array.from(selectedSegments).map((segmentId) => ({
+        id: segmentId,
         district_id: selectedDistrict === "none" ? null : selectedDistrict,
       }));
 
       for (const update of updates) {
         const { error } = await supabase
-          .from("streets")
+          .from("segments")
           .update({ district_id: update.district_id })
           .eq("id", update.id);
 
         if (error) throw error;
       }
 
-      toast.success(`${selectedStreets.size} rue${selectedStreets.size > 1 ? 's assignées' : ' assignée'}`);
-      setSelectedStreets(new Set());
+      toast.success(`${selectedSegments.size} segment${selectedSegments.size > 1 ? 's assignés' : ' assigné'}`);
+      setSelectedSegments(new Set());
       setSelectedDistrict("");
+      setSelectedStreetForSegments(null);
       fetchData();
     } catch (error: any) {
       toast.error("Erreur lors de l'assignation");
     }
   };
 
-  const selectByDistrict = (districtId: string | null) => {
-    const streetsInDistrict = streets.filter(s => s.district_id === districtId);
-    setSelectedStreets(new Set(streetsInDistrict.map(s => s.id)));
+  const handleDeleteStreet = async (streetId: string) => {
+    if (!confirm("Supprimer cette rue et tous ses segments ?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("streets")
+        .delete()
+        .eq("id", streetId);
+
+      if (error) throw error;
+      toast.success("Rue supprimée");
+      setSelectedStreetForSegments(null);
+      fetchData();
+    } catch (error: any) {
+      toast.error("Erreur lors de la suppression");
+    }
   };
 
-  const selectAll = () => {
-    setSelectedStreets(new Set(streets.map(s => s.id)));
+  const getSideLabel = (side: string) => {
+    const labels: Record<string, string> = {
+      even: "Pairs",
+      odd: "Impairs",
+      both: "Les deux",
+    };
+    return labels[side] || side;
   };
 
-  const deselectAll = () => {
-    setSelectedStreets(new Set());
+  const getDistrictName = (districtId: string | null) => {
+    if (!districtId) return "Non assigné";
+    const district = districts.find(d => d.id === districtId);
+    return district?.name || "Inconnu";
+  };
+
+  const getDistrictColor = (districtId: string | null) => {
+    if (!districtId) return UNASSIGNED_COLOR;
+    const district = districts.find(d => d.id === districtId);
+    return district?.color || UNASSIGNED_COLOR;
   };
 
   if (loading) {
@@ -345,10 +390,10 @@ const ZoneMapAssignment = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MapPin className="w-5 h-5" />
-            Assignation sur la carte
+            Assignation par segments sur la carte
           </CardTitle>
           <CardDescription>
-            Cliquez sur les rues de la carte pour les sélectionner, puis assignez-les à une zone
+            Cliquez sur une rue pour sélectionner ses segments (pairs/impairs, numéros spécifiques)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -377,11 +422,11 @@ const ZoneMapAssignment = () => {
             </div>
             <Button
               onClick={handleBulkAssign}
-              disabled={selectedStreets.size === 0 || !selectedDistrict}
+              disabled={selectedSegments.size === 0 || !selectedDistrict}
               size="lg"
             >
               <Check className="w-4 h-4 mr-2" />
-              Assigner {selectedStreets.size > 0 && `(${selectedStreets.size})`}
+              Assigner {selectedSegments.size > 0 && `(${selectedSegments.size})`}
             </Button>
             <Button
               onClick={() => fetchData()}
@@ -393,56 +438,19 @@ const ZoneMapAssignment = () => {
             </Button>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={selectAll}>
-              Tout sélectionner
-            </Button>
-            <Button variant="outline" size="sm" onClick={deselectAll}>
-              Tout désélectionner
-            </Button>
-            <div className="border-l mx-2"></div>
-            {districts.map((district) => (
-              <Button
-                key={district.id}
-                variant="outline"
-                size="sm"
-                onClick={() => selectByDistrict(district.id)}
-              >
-                <span
-                  className="w-3 h-3 rounded-full inline-block mr-1"
-                  style={{ backgroundColor: district.color }}
-                />
-                {district.name}
-              </Button>
-            ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => selectByDistrict(null)}
-            >
-              Non assignées
-            </Button>
-          </div>
-
-          {selectedStreets.size > 0 && (
+          {selectedSegments.size > 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <p className="text-sm font-medium text-yellow-800">
-                {selectedStreets.size} rue{selectedStreets.size > 1 ? 's' : ''} sélectionnée{selectedStreets.size > 1 ? 's' : ''}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {Array.from(selectedStreets).slice(0, 10).map(id => {
-                  const street = streets.find(s => s.id === id);
-                  return street ? (
-                    <Badge key={id} variant="secondary" className="text-xs">
-                      {street.name}
-                    </Badge>
-                  ) : null;
-                })}
-                {selectedStreets.size > 10 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{selectedStreets.size - 10} autres...
-                  </Badge>
-                )}
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-yellow-800">
+                  {selectedSegments.size} segment{selectedSegments.size > 1 ? 's' : ''} sélectionné{selectedSegments.size > 1 ? 's' : ''}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedSegments(new Set())}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           )}
@@ -453,7 +461,7 @@ const ZoneMapAssignment = () => {
         <CardHeader>
           <CardTitle>Carte interactive</CardTitle>
           <CardDescription>
-            Cliquez sur une rue pour la sélectionner • CTRL/⌘+clic pour sélection multiple
+            Cliquez sur une rue pour voir et sélectionner ses segments
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -466,17 +474,16 @@ const ZoneMapAssignment = () => {
               <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: SELECTED_COLOR }} />
               <span className="text-xs md:text-sm">Sélectionnée</span>
             </div>
-            {districts.slice(0, 5).map((district) => (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: MIXED_COLOR }} />
+              <span className="text-xs md:text-sm">Zones multiples</span>
+            </div>
+            {districts.slice(0, 4).map((district) => (
               <div key={district.id} className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: district.color }} />
                 <span className="text-xs md:text-sm">{district.name}</span>
               </div>
             ))}
-            {districts.length > 5 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs md:text-sm text-muted-foreground">+{districts.length - 5} zones...</span>
-              </div>
-            )}
           </div>
 
           <div
@@ -488,10 +495,10 @@ const ZoneMapAssignment = () => {
                 <div className="bg-background p-6 rounded-lg shadow-lg text-center max-w-md">
                   <p className="text-lg font-semibold mb-2">Aucune rue avec coordonnées GPS</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Pour afficher les rues sur la carte, vous devez d'abord importer leurs coordonnées depuis OpenStreetMap.
+                    Pour afficher les rues sur la carte, importez d'abord leurs coordonnées depuis OpenStreetMap.
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Allez dans <strong>"Import rues"</strong> dans le menu de navigation pour importer les coordonnées GPS de vos rues.
+                    Allez dans <strong>"Import rues"</strong> dans le menu de navigation.
                   </p>
                 </div>
               </div>
@@ -501,14 +508,100 @@ const ZoneMapAssignment = () => {
           <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg mt-4">
             <p className="font-medium mb-2">💡 Astuces :</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Cliquez sur une rue pour la sélectionner</li>
-              <li>Maintenez CTRL (ou ⌘ sur Mac) + clic pour sélectionner plusieurs rues</li>
-              <li>Utilisez les boutons de sélection rapide pour sélectionner toutes les rues d'une zone</li>
-              <li>Les rues sélectionnées apparaissent en jaune sur la carte</li>
+              <li>Cliquez sur une rue pour voir ses segments</li>
+              <li>Sélectionnez les segments individuellement (pairs/impairs, numéros spécifiques)</li>
+              <li>Les rues avec plusieurs zones apparaissent en violet</li>
+              <li>Assignez les segments sélectionnés à une zone avec le bouton "Assigner"</li>
             </ul>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={selectedStreetForSegments !== null} onOpenChange={(open) => !open && setSelectedStreetForSegments(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{selectedStreetForSegments?.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => selectedStreetForSegments && handleDeleteStreet(selectedStreetForSegments.id)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Supprimer la rue
+              </Button>
+            </DialogTitle>
+            <DialogDescription>
+              Sélectionnez les segments à assigner à une zone
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedStreetForSegments && selectAllSegmentsInStreet(selectedStreetForSegments)}
+              >
+                Tout sélectionner
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => selectedStreetForSegments && deselectAllSegmentsInStreet(selectedStreetForSegments)}
+              >
+                Tout désélectionner
+              </Button>
+            </div>
+
+            {selectedStreetForSegments?.segments && selectedStreetForSegments.segments.length > 0 ? (
+              <div className="space-y-2">
+                {selectedStreetForSegments.segments.map((segment) => (
+                  <div
+                    key={segment.id}
+                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                      selectedSegments.has(segment.id)
+                        ? 'bg-yellow-50 border-yellow-300'
+                        : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => toggleSegment(segment.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedSegments.has(segment.id)}
+                        onCheckedChange={() => toggleSegment(segment.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium">
+                            N° {segment.number_start} à {segment.number_end} • {getSideLabel(segment.side)}
+                          </p>
+                          <Badge
+                            style={{
+                              borderLeft: `4px solid ${getDistrictColor(segment.district_id)}`,
+                            }}
+                          >
+                            {getDistrictName(segment.district_id)}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Type: {segment.building_type}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aucun segment défini pour cette rue. Allez dans "Rues & Segments" pour en créer.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
