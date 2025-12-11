@@ -102,6 +102,11 @@ const ZoneMapAssignment = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // First check total streets count
+      const { count: totalStreets } = await supabase
+        .from("streets")
+        .select("*", { count: 'exact', head: true });
+
       // Fetch all streets with coordinates
       const { data: streetsData, error: streetsError } = await supabase
         .from("streets")
@@ -110,6 +115,19 @@ const ZoneMapAssignment = () => {
         .order("name");
 
       if (streetsError) throw streetsError;
+
+      console.log(`Total streets in DB: ${totalStreets}, Streets with coordinates: ${streetsData?.length || 0}`);
+
+      if (!streetsData || streetsData.length === 0) {
+        if (totalStreets && totalStreets > 0) {
+          toast.info(`Aucune rue avec coordonnées GPS trouvée. Utilisez "Import rues" pour importer les coordonnées depuis OpenStreetMap.`, {
+            duration: 5000,
+          });
+        } else {
+          toast.info("Aucune rue trouvée dans la base de données.");
+        }
+      }
+
       setStreets(streetsData || []);
 
       // Fetch districts
@@ -121,6 +139,7 @@ const ZoneMapAssignment = () => {
       if (districtsError) throw districtsError;
       setDistricts(districtsData || []);
     } catch (error: any) {
+      console.error("Error fetching data:", error);
       toast.error("Erreur lors du chargement des données");
     } finally {
       setLoading(false);
@@ -129,6 +148,8 @@ const ZoneMapAssignment = () => {
 
   const renderStreets = () => {
     if (!mapRef.current) return;
+
+    console.log(`🗺️ Rendering ${streets.length} streets on map`);
 
     // Remove all existing polylines
     polylinesRef.current.forEach((polylines) => {
@@ -155,9 +176,16 @@ const ZoneMapAssignment = () => {
     }
 
     const allPolylines: L.Polyline[] = [];
+    let renderedCount = 0;
+    let errorCount = 0;
 
     streets.forEach((street) => {
-      if (!mapRef.current || !street.coordinates) return;
+      if (!mapRef.current || !street.coordinates) {
+        if (!street.coordinates) {
+          console.warn(`⚠️ Street "${street.name}" has no coordinates`);
+        }
+        return;
+      }
 
       try {
         const coords = street.coordinates;
@@ -209,19 +237,26 @@ const ZoneMapAssignment = () => {
         }
 
         polylinesRef.current.set(street.id, streetPolylines);
+        renderedCount++;
       } catch (error) {
-        console.error(`Erreur lors de l'ajout de la rue ${street.name}:`, error);
+        console.error(`❌ Erreur lors de l'ajout de la rue ${street.name}:`, error);
+        errorCount++;
       }
     });
+
+    console.log(`✅ Rendered ${renderedCount} streets, ${errorCount} errors, ${allPolylines.length} total polylines`);
 
     // Fit bounds to show all streets
     if (allPolylines.length > 0 && mapRef.current) {
       try {
         const group = L.featureGroup(allPolylines);
         mapRef.current.fitBounds(group.getBounds().pad(0.1));
+        console.log(`📍 Map centered on ${allPolylines.length} polylines`);
       } catch (error) {
-        console.error('Erreur lors du centrage de la carte:', error);
+        console.error('❌ Erreur lors du centrage de la carte:', error);
       }
+    } else {
+      console.warn(`⚠️ No polylines to display on map (streets: ${streets.length}, allPolylines: ${allPolylines.length})`);
     }
   };
 
@@ -447,7 +482,21 @@ const ZoneMapAssignment = () => {
           <div
             ref={mapContainerRef}
             className="w-full h-[75vh] md:h-[calc(100vh-400px)] min-h-[500px] rounded-lg overflow-hidden border relative"
-          />
+          >
+            {streets.length === 0 && !loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/80 z-[1000] pointer-events-none">
+                <div className="bg-background p-6 rounded-lg shadow-lg text-center max-w-md">
+                  <p className="text-lg font-semibold mb-2">Aucune rue avec coordonnées GPS</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Pour afficher les rues sur la carte, vous devez d'abord importer leurs coordonnées depuis OpenStreetMap.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Allez dans <strong>"Import rues"</strong> dans le menu de navigation pour importer les coordonnées GPS de vos rues.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg mt-4">
             <p className="font-medium mb-2">💡 Astuces :</p>
