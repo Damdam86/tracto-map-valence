@@ -97,7 +97,7 @@ const ZoneMapAssignment = () => {
   useEffect(() => {
     if (!mapRef.current || streets.length === 0) return;
     renderStreets();
-  }, [streets, selectedStreets]);
+  }, [streets, selectedStreets, districts]); // Added districts to dependencies
 
   const fetchData = async () => {
     setLoading(true);
