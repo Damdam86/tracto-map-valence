@@ -128,7 +128,7 @@ const ZoneMapAssignment = () => {
         }
       }
 
-      setStreets(streetsData || []);
+      setStreets((streetsData || []) as Street[]);
 
       // Fetch districts
       const { data: districtsData, error: districtsError } = await supabase

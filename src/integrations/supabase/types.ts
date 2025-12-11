@@ -169,6 +169,7 @@ export type Database = {
         Row: {
           building_type: Database["public"]["Enums"]["building_type"]
           created_at: string
+          district_id: string | null
           id: string
           notes: string | null
           number_end: number
@@ -180,6 +181,7 @@ export type Database = {
         Insert: {
           building_type?: Database["public"]["Enums"]["building_type"]
           created_at?: string
+          district_id?: string | null
           id?: string
           notes?: string | null
           number_end: number
@@ -191,6 +193,7 @@ export type Database = {
         Update: {
           building_type?: Database["public"]["Enums"]["building_type"]
           created_at?: string
+          district_id?: string | null
           id?: string
           notes?: string | null
           number_end?: number
@@ -200,6 +203,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "segments_district_id_fkey"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "districts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "segments_street_id_fkey"
             columns: ["street_id"]
