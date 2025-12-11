@@ -68,7 +68,7 @@ const Layout = ({ children }: LayoutProps) => {
   const adminNavigation = [
     { name: "Tableau de bord", href: "/", icon: LayoutDashboard },
     { name: "Invitations", href: "/invitations", icon: UserPlus },
-    { name: "Quartiers", href: "/districts", icon: MapPin },
+    { name: "Zones", href: "/districts", icon: MapPin },
     { name: "Import rues", href: "/import-streets", icon: Download },
     { name: "Rues & Segments", href: "/streets", icon: MapPin },
     { name: "Campagnes", href: "/campaigns", icon: ClipboardList },
