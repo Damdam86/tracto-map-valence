@@ -149,6 +149,8 @@ const ZoneMapAssignment = () => {
   const renderStreets = () => {
     if (!mapRef.current) return;
 
+    console.log(`🗺️ Rendering ${streets.length} streets on map`);
+
     // Remove all existing polylines
     polylinesRef.current.forEach((polylines) => {
       polylines.forEach(p => {
@@ -174,9 +176,16 @@ const ZoneMapAssignment = () => {
     }
 
     const allPolylines: L.Polyline[] = [];
+    let renderedCount = 0;
+    let errorCount = 0;
 
     streets.forEach((street) => {
-      if (!mapRef.current || !street.coordinates) return;
+      if (!mapRef.current || !street.coordinates) {
+        if (!street.coordinates) {
+          console.warn(`⚠️ Street "${street.name}" has no coordinates`);
+        }
+        return;
+      }
 
       try {
         const coords = street.coordinates;
@@ -228,19 +237,26 @@ const ZoneMapAssignment = () => {
         }
 
         polylinesRef.current.set(street.id, streetPolylines);
+        renderedCount++;
       } catch (error) {
-        console.error(`Erreur lors de l'ajout de la rue ${street.name}:`, error);
+        console.error(`❌ Erreur lors de l'ajout de la rue ${street.name}:`, error);
+        errorCount++;
       }
     });
+
+    console.log(`✅ Rendered ${renderedCount} streets, ${errorCount} errors, ${allPolylines.length} total polylines`);
 
     // Fit bounds to show all streets
     if (allPolylines.length > 0 && mapRef.current) {
       try {
         const group = L.featureGroup(allPolylines);
         mapRef.current.fitBounds(group.getBounds().pad(0.1));
+        console.log(`📍 Map centered on ${allPolylines.length} polylines`);
       } catch (error) {
-        console.error('Erreur lors du centrage de la carte:', error);
+        console.error('❌ Erreur lors du centrage de la carte:', error);
       }
+    } else {
+      console.warn(`⚠️ No polylines to display on map (streets: ${streets.length}, allPolylines: ${allPolylines.length})`);
     }
   };
 
