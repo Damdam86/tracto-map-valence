@@ -448,7 +448,7 @@ const Assignments = () => {
           </TabsTrigger>
           <TabsTrigger value="districts">
             <MapPin className="w-4 h-4 mr-2" />
-            Par quartiers
+            Par zones
           </TabsTrigger>
         </TabsList>
 

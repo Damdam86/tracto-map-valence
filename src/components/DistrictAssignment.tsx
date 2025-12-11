@@ -118,7 +118,7 @@ export const DistrictAssignment = ({ campaignId, onAssignmentComplete }: Distric
 
   const handleAssignDistrict = async () => {
     if (!selectedDistrict || !campaignId) {
-      toast.error("Veuillez sélectionner un quartier");
+      toast.error("Veuillez sélectionner une zone");
       return;
     }
 
@@ -144,7 +144,7 @@ export const DistrictAssignment = ({ campaignId, onAssignmentComplete }: Distric
       if (streetsError) throw streetsError;
 
       if (!streets || streets.length === 0) {
-        toast.error("Aucune rue trouvée dans ce quartier");
+        toast.error("Aucune rue trouvée dans cette zone");
         setLoading(false);
         return;
       }
@@ -160,7 +160,7 @@ export const DistrictAssignment = ({ campaignId, onAssignmentComplete }: Distric
       if (segmentsError) throw segmentsError;
 
       if (!segments || segments.length === 0) {
-        toast.error("Aucun segment trouvé dans ce quartier");
+        toast.error("Aucun segment trouvé dans cette zone");
         setLoading(false);
         return;
       }
@@ -214,17 +214,17 @@ export const DistrictAssignment = ({ campaignId, onAssignmentComplete }: Distric
 
       const districtName = districts.find(d => d.id === selectedDistrict)?.name;
 
-      toast.success(`Quartier "${districtName}" assigné à ${assigneeName} (${segmentIds.length} segments)`);
-      
+      toast.success(`Zone "${districtName}" assignée à ${assigneeName} (${segmentIds.length} segments)`);
+
       // Reset form
       setSelectedDistrict("");
       setSelectedVolunteer("");
       setSelectedTeam("");
       setStreetCount(0);
-      
+
       onAssignmentComplete();
     } catch (error: any) {
-      toast.error("Erreur lors de l'assignation du quartier");
+      toast.error("Erreur lors de l'assignation de la zone");
       console.error(error);
     } finally {
       setLoading(false);
@@ -238,18 +238,18 @@ export const DistrictAssignment = ({ campaignId, onAssignmentComplete }: Distric
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MapPin className="w-5 h-5" />
-          Assignation par quartiers
+          Assignation par zones
         </CardTitle>
         <CardDescription>
-          Assignez tous les segments d'un quartier entier en une seule fois
+          Assignez tous les segments d'une zone entière en une seule fois
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <Label>Quartier</Label>
+          <Label>Zone</Label>
           <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
             <SelectTrigger>
-              <SelectValue placeholder="Sélectionnez un quartier" />
+              <SelectValue placeholder="Sélectionnez une zone" />
             </SelectTrigger>
             <SelectContent>
               {districts.map((district) => (
@@ -354,7 +354,7 @@ export const DistrictAssignment = ({ campaignId, onAssignmentComplete }: Distric
           className="w-full"
           size="lg"
         >
-          {loading ? "Assignation en cours..." : `Assigner le quartier (${streetCount} segments)`}
+          {loading ? "Assignation en cours..." : `Assigner la zone (${streetCount} segments)`}
         </Button>
       </CardContent>
     </Card>

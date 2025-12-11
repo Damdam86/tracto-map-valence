@@ -84,7 +84,7 @@ const Streets = () => {
       if (error) throw error;
       setDistricts(data || []);
     } catch (error: any) {
-      toast.error("Erreur lors du chargement des quartiers");
+      toast.error("Erreur lors du chargement des zones");
     }
   };
 
@@ -355,16 +355,16 @@ const Streets = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="district_select">Quartier (cluster)</Label>
+                <Label htmlFor="district_select">Zone</Label>
                 <Select
                   value={streetFormData.district_id || "none"}
                   onValueChange={(value) => setStreetFormData({ ...streetFormData, district_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez un quartier" />
+                    <SelectValue placeholder="Sélectionnez une zone" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Aucun quartier</SelectItem>
+                    <SelectItem value="none">Aucune zone</SelectItem>
                     {districts.map((district) => (
                       <SelectItem key={district.id} value={district.id}>
                         <span className="flex items-center gap-2">
