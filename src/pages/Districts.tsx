@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, MapPin, Trash2, Edit, List } from "lucide-react";
+import { Plus, MapPin, Trash2, Edit, List, Map } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import ZoneStreetAssignment from "@/components/ZoneStreetAssignment";
+import ZoneMapAssignment from "@/components/ZoneMapAssignment";
 
 interface District {
   id: string;
@@ -187,6 +188,10 @@ const Districts = () => {
             <List className="w-4 h-4" />
             Assigner les rues
           </TabsTrigger>
+          <TabsTrigger value="map" className="gap-2">
+            <Map className="w-4 h-4" />
+            Carte interactive
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="zones" className="space-y-6">
@@ -325,6 +330,10 @@ const Districts = () => {
 
         <TabsContent value="assign">
           <ZoneStreetAssignment />
+        </TabsContent>
+
+        <TabsContent value="map">
+          <ZoneMapAssignment />
         </TabsContent>
       </Tabs>
     </div>
