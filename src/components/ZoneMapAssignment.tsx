@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Check, MapPin, RefreshCw, Trash2, X } from "lucide-react";
+import { Check, MapPin, RefreshCw, Trash2, X, Split } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -545,6 +545,97 @@ const ZoneMapAssignment = () => {
     }
   };
 
+  const handleSplitSegment = async (segment: Segment) => {
+    if (segment.side !== 'both') {
+      toast.error("Ce segment est déjà divisé par côté");
+      return;
+    }
+
+    try {
+      // Calculer les plages de numéros pour pairs et impairs
+      const firstEven = segment.number_start % 2 === 0 ? segment.number_start : segment.number_start + 1;
+      const lastEven = segment.number_end % 2 === 0 ? segment.number_end : segment.number_end - 1;
+
+      const firstOdd = segment.number_start % 2 === 1 ? segment.number_start : segment.number_start + 1;
+      const lastOdd = segment.number_end % 2 === 1 ? segment.number_end : segment.number_end - 1;
+
+      // Créer le segment pairs
+      if (firstEven <= lastEven) {
+        const { error: evenError } = await supabase
+          .from("segments")
+          .insert({
+            street_id: segment.street_id,
+            number_start: firstEven,
+            number_end: lastEven,
+            side: 'even',
+            building_type: segment.building_type,
+            district_id: segment.district_id,
+          });
+
+        if (evenError) throw evenError;
+      }
+
+      // Créer le segment impairs
+      if (firstOdd <= lastOdd) {
+        const { error: oddError } = await supabase
+          .from("segments")
+          .insert({
+            street_id: segment.street_id,
+            number_start: firstOdd,
+            number_end: lastOdd,
+            side: 'odd',
+            building_type: segment.building_type,
+            district_id: segment.district_id,
+          });
+
+        if (oddError) throw oddError;
+      }
+
+      // Supprimer le segment "both" original
+      const { error: deleteError } = await supabase
+        .from("segments")
+        .delete()
+        .eq("id", segment.id);
+
+      if (deleteError) throw deleteError;
+
+      toast.success("Segment divisé en Pairs et Impairs");
+
+      // Rafraîchir les données
+      await fetchData();
+
+      // Mettre à jour les données de la rue affichée dans le dialog
+      if (selectedStreetForSegments) {
+        const { data: updatedStreet } = await supabase
+          .from("streets")
+          .select(`
+            id,
+            name,
+            type,
+            coordinates,
+            segments (
+              id,
+              street_id,
+              number_start,
+              number_end,
+              side,
+              building_type,
+              district_id
+            )
+          `)
+          .eq("id", selectedStreetForSegments.id)
+          .single();
+
+        if (updatedStreet) {
+          setSelectedStreetForSegments(updatedStreet as any);
+        }
+      }
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la division:", error);
+      toast.error("Erreur lors de la division du segment");
+    }
+  };
+
   const getSideLabel = (side: string) => {
     const labels: Record<string, string> = {
       even: "Pairs",
@@ -764,17 +855,34 @@ const ZoneMapAssignment = () => {
                         onClick={(e) => e.stopPropagation()}
                       />
                       <div className="flex-1">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <p className="font-medium">
                             N° {segment.number_start} à {segment.number_end} • {getSideLabel(segment.side)}
                           </p>
-                          <Badge
-                            style={{
-                              borderLeft: `4px solid ${getDistrictColor(segment.district_id)}`,
-                            }}
-                          >
-                            {getDistrictName(segment.district_id)}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            {segment.side === 'both' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSplitSegment(segment);
+                                }}
+                                className="h-7 text-xs"
+                                title="Diviser en Pairs et Impairs"
+                              >
+                                <Split className="w-3 h-3 mr-1" />
+                                Diviser
+                              </Button>
+                            )}
+                            <Badge
+                              style={{
+                                borderLeft: `4px solid ${getDistrictColor(segment.district_id)}`,
+                              }}
+                            >
+                              {getDistrictName(segment.district_id)}
+                            </Badge>
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
                           Type: {segment.building_type}
