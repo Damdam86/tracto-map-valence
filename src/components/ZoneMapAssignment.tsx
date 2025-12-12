@@ -281,11 +281,13 @@ const ZoneMapAssignment = () => {
 
   const toggleSegment = (segmentId: string) => {
     const newSelection = new Set(selectedSegments);
+    const action = newSelection.has(segmentId) ? 'désélectionné' : 'sélectionné';
     if (newSelection.has(segmentId)) {
       newSelection.delete(segmentId);
     } else {
       newSelection.add(segmentId);
     }
+    console.log(`🔘 Segment ${action}:`, segmentId, `→ Total: ${newSelection.size} segment(s)`);
     setSelectedSegments(newSelection);
   };
 
@@ -318,7 +320,15 @@ const ZoneMapAssignment = () => {
         district_id: selectedDistrict === "none" ? null : selectedDistrict,
       }));
 
+      console.log("🎯 Assignation de segments:", {
+        nbSegments: updates.length,
+        segmentIds: updates.map(u => u.id),
+        districtId: selectedDistrict,
+        districtName: districts.find(d => d.id === selectedDistrict)?.name
+      });
+
       for (const update of updates) {
+        console.log(`  ↳ Mise à jour segment ${update.id} → zone ${districts.find(d => d.id === update.district_id)?.name || 'aucune'}`);
         const { error } = await supabase
           .from("segments")
           .update({ district_id: update.district_id })
@@ -330,9 +340,37 @@ const ZoneMapAssignment = () => {
       toast.success(`${selectedSegments.size} segment${selectedSegments.size > 1 ? 's assignés' : ' assigné'}`);
       setSelectedSegments(new Set());
       setSelectedDistrict("");
-      setSelectedStreetForSegments(null);
-      fetchData();
+      // Ne pas fermer le dialog pour permettre d'assigner d'autres segments
+      await fetchData();
+
+      // Mettre à jour les données de la rue affichée dans le dialog
+      if (selectedStreetForSegments) {
+        const { data: updatedStreet } = await supabase
+          .from("streets")
+          .select(`
+            id,
+            name,
+            type,
+            coordinates,
+            segments (
+              id,
+              street_id,
+              number_start,
+              number_end,
+              side,
+              building_type,
+              district_id
+            )
+          `)
+          .eq("id", selectedStreetForSegments.id)
+          .single();
+
+        if (updatedStreet) {
+          setSelectedStreetForSegments(updatedStreet as any);
+        }
+      }
     } catch (error: any) {
+      console.error("❌ Erreur lors de l'assignation:", error);
       toast.error("Erreur lors de l'assignation");
     }
   };
