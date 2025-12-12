@@ -216,24 +216,88 @@ const ZoneMapAssignment = () => {
         const isMultiLineString = Array.isArray(coords[0]) && Array.isArray(coords[0][0]);
 
         const hasSelectedSegments = street.segments?.some(seg => selectedSegments.has(seg.id));
-        const color = hasSelectedSegments ? SELECTED_COLOR : getStreetColor(street);
 
-        const polylineOptions = {
-          color,
-          weight: hasSelectedSegments ? 7 : 5,
-          opacity: hasSelectedSegments ? 1 : 0.7,
-        };
+        // Trier les segments par number_start
+        const sortedSegments = street.segments ? [...street.segments].sort((a, b) => a.number_start - b.number_start) : [];
 
-        const segmentCount = street.segments?.length || 0;
-        const assignedCount = street.segments?.filter(s => s.district_id)?.length || 0;
+        const segmentCount = sortedSegments.length;
+        const assignedCount = sortedSegments.filter(s => s.district_id).length;
         const tooltipText = `<strong>${street.name}</strong><br/>${segmentCount} segment(s) • ${assignedCount} assigné(s)<br/><em>Cliquez pour voir les segments</em>`;
 
         const streetPolylines: L.Polyline[] = [];
 
-        if (isMultiLineString) {
-          const ways = coords as number[][][];
-          ways.forEach((way) => {
-            const line: [number, number][] = way.map(coord => [coord[0], coord[1]]);
+        // Vérifier si on doit diviser la rue par segments
+        const uniqueZones = new Set(sortedSegments.map(s => s.district_id).filter(Boolean));
+        const shouldDivideBySegments = uniqueZones.size > 1 && sortedSegments.length > 1;
+
+        if (shouldDivideBySegments && !isMultiLineString) {
+          // Diviser la rue en plusieurs polylines, une par segment
+          const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
+          const totalPoints = line.length;
+
+          sortedSegments.forEach((segment, segIndex) => {
+            // Calculer quelle portion de la géométrie ce segment devrait occuper
+            const startRatio = segIndex / sortedSegments.length;
+            const endRatio = (segIndex + 1) / sortedSegments.length;
+
+            const startIdx = Math.floor(startRatio * (totalPoints - 1));
+            const endIdx = Math.ceil(endRatio * (totalPoints - 1));
+
+            const segmentLine = line.slice(startIdx, endIdx + 1);
+
+            if (segmentLine.length >= 2) {
+              const isSegmentSelected = selectedSegments.has(segment.id);
+              const segmentColor = isSegmentSelected
+                ? SELECTED_COLOR
+                : (segment.district_id
+                    ? (districts.find(d => d.id === segment.district_id)?.color || UNASSIGNED_COLOR)
+                    : UNASSIGNED_COLOR);
+
+              const polylineOptions = {
+                color: segmentColor,
+                weight: isSegmentSelected ? 7 : 5,
+                opacity: isSegmentSelected ? 1 : 0.7,
+              };
+
+              const polyline = L.polyline(segmentLine, polylineOptions).addTo(mapRef.current!);
+              polyline.bindTooltip(tooltipText, { direction: 'top' });
+
+              polyline.on('click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                handleStreetClick(street);
+              });
+
+              streetPolylines.push(polyline);
+              allPolylines.push(polyline);
+            }
+          });
+        } else {
+          // Comportement original : toute la rue d'une seule couleur
+          const color = hasSelectedSegments ? SELECTED_COLOR : getStreetColor(street);
+
+          const polylineOptions = {
+            color,
+            weight: hasSelectedSegments ? 7 : 5,
+            opacity: hasSelectedSegments ? 1 : 0.7,
+          };
+
+          if (isMultiLineString) {
+            const ways = coords as number[][][];
+            ways.forEach((way) => {
+              const line: [number, number][] = way.map(coord => [coord[0], coord[1]]);
+              const polyline = L.polyline(line, polylineOptions).addTo(mapRef.current!);
+              polyline.bindTooltip(tooltipText, { direction: 'top' });
+
+              polyline.on('click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                handleStreetClick(street);
+              });
+
+              streetPolylines.push(polyline);
+              allPolylines.push(polyline);
+            });
+          } else {
+            const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
             const polyline = L.polyline(line, polylineOptions).addTo(mapRef.current!);
             polyline.bindTooltip(tooltipText, { direction: 'top' });
 
@@ -244,19 +308,7 @@ const ZoneMapAssignment = () => {
 
             streetPolylines.push(polyline);
             allPolylines.push(polyline);
-          });
-        } else {
-          const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
-          const polyline = L.polyline(line, polylineOptions).addTo(mapRef.current!);
-          polyline.bindTooltip(tooltipText, { direction: 'top' });
-
-          polyline.on('click', (e) => {
-            L.DomEvent.stopPropagation(e);
-            handleStreetClick(street);
-          });
-
-          streetPolylines.push(polyline);
-          allPolylines.push(polyline);
+          }
         }
 
         polylinesRef.current.set(street.id, streetPolylines);
