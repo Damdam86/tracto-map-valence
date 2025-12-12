@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Checkbox } from "@/components/ui/checkbox";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import * as turf from '@turf/turf';
 
 // Fix Leaflet default marker icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -47,6 +48,27 @@ interface District {
 const UNASSIGNED_COLOR = "#94a3b8";
 const SELECTED_COLOR = "#facc15";
 const MIXED_COLOR = "#8b5cf6";
+
+// Helper functions for parallel lines
+const leafletToGeoJSON = (coords: number[][]): number[][] => {
+  return coords.map(([lat, lon]) => [lon, lat]);
+};
+
+const geoJSONToLeaflet = (coords: number[][]): [number, number][] => {
+  return coords.map(([lon, lat]): [number, number] => [lat, lon]);
+};
+
+const createParallelLine = (coords: number[][], offsetMeters: number): [number, number][] | null => {
+  try {
+    const geoCoords = leafletToGeoJSON(coords);
+    const line = turf.lineString(geoCoords);
+    const offsetLine = turf.lineOffset(line, offsetMeters / 1000, { units: 'kilometers' });
+    return geoJSONToLeaflet(offsetLine.geometry.coordinates);
+  } catch (error) {
+    console.error("Error creating parallel line:", error);
+    return null;
+  }
+};
 
 const ZoneMapAssignment = () => {
   const [streets, setStreets] = useState<Street[]>([]);
@@ -226,66 +248,81 @@ const ZoneMapAssignment = () => {
 
         const streetPolylines: L.Polyline[] = [];
 
-        // Vérifier si on doit diviser la rue par segments
+        // Grouper les segments par côté (pairs/impairs)
+        const evenSegments = sortedSegments.filter(s => s.side === 'even' || s.side === 'both');
+        const oddSegments = sortedSegments.filter(s => s.side === 'odd' || s.side === 'both');
+
+        const hasMultipleSides = evenSegments.length > 0 && oddSegments.length > 0 &&
+          (evenSegments.some(s => s.district_id) || oddSegments.some(s => s.district_id));
+
         const uniqueZones = new Set(sortedSegments.map(s => s.district_id).filter(Boolean));
         const shouldDivideBySegments = uniqueZones.size > 1 && sortedSegments.length > 1 && !isMultiLineString;
 
-        if (shouldDivideBySegments) {
-          // Fonction pour diviser une ligne en segments
-          const divideLineIntoSegments = (line: [number, number][]) => {
-            const totalPoints = line.length;
+        // Fonction pour diviser une ligne en segments selon les zones
+        const divideLineIntoSegments = (line: [number, number][], segments: Segment[]) => {
+          if (segments.length === 0) return;
 
-            sortedSegments.forEach((segment, segIndex) => {
-              // Calculer quelle portion de la géométrie ce segment devrait occuper
-              const startRatio = segIndex / sortedSegments.length;
-              const endRatio = (segIndex + 1) / sortedSegments.length;
+          const totalPoints = line.length;
+          segments.forEach((segment, segIndex) => {
+            const startRatio = segIndex / segments.length;
+            const endRatio = (segIndex + 1) / segments.length;
 
-              const startIdx = Math.floor(startRatio * (totalPoints - 1));
-              const endIdx = Math.ceil(endRatio * (totalPoints - 1));
+            const startIdx = Math.floor(startRatio * (totalPoints - 1));
+            const endIdx = Math.ceil(endRatio * (totalPoints - 1));
 
-              const segmentLine = line.slice(startIdx, endIdx + 1);
+            const segmentLine = line.slice(startIdx, endIdx + 1);
 
-              if (segmentLine.length >= 2) {
-                const isSegmentSelected = selectedSegments.has(segment.id);
-                const segmentColor = isSegmentSelected
-                  ? SELECTED_COLOR
-                  : (segment.district_id
-                      ? (districts.find(d => d.id === segment.district_id)?.color || UNASSIGNED_COLOR)
-                      : UNASSIGNED_COLOR);
+            if (segmentLine.length >= 2) {
+              const isSegmentSelected = selectedSegments.has(segment.id);
+              const segmentColor = isSegmentSelected
+                ? SELECTED_COLOR
+                : (segment.district_id
+                    ? (districts.find(d => d.id === segment.district_id)?.color || UNASSIGNED_COLOR)
+                    : UNASSIGNED_COLOR);
 
-                const polylineOptions = {
-                  color: segmentColor,
-                  weight: isSegmentSelected ? 7 : 5,
-                  opacity: isSegmentSelected ? 1 : 0.7,
-                };
+              const polylineOptions = {
+                color: segmentColor,
+                weight: isSegmentSelected ? 7 : 5,
+                opacity: isSegmentSelected ? 1 : 0.7,
+              };
 
-                const polyline = L.polyline(segmentLine, polylineOptions).addTo(mapRef.current!);
-                polyline.bindTooltip(tooltipText, { direction: 'top' });
+              const polyline = L.polyline(segmentLine, polylineOptions).addTo(mapRef.current!);
+              polyline.bindTooltip(tooltipText, { direction: 'top' });
 
-                polyline.on('click', (e) => {
-                  L.DomEvent.stopPropagation(e);
-                  handleStreetClick(street);
-                });
+              polyline.on('click', (e) => {
+                L.DomEvent.stopPropagation(e);
+                handleStreetClick(street);
+              });
 
-                streetPolylines.push(polyline);
-                allPolylines.push(polyline);
-              }
-            });
-          };
+              streetPolylines.push(polyline);
+              allPolylines.push(polyline);
+            }
+          });
+        };
 
-          // Diviser la rue en plusieurs polylines, une par segment
-          if (isMultiLineString) {
-            // Pour MultiLineString, diviser chaque way
-            const ways = coords as number[][][];
-            ways.forEach((way) => {
-              const line: [number, number][] = way.map(coord => [coord[0], coord[1]]);
-              divideLineIntoSegments(line);
-            });
-          } else {
-            // Pour LineString simple
-            const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
-            divideLineIntoSegments(line);
+        if (hasMultipleSides && !isMultiLineString) {
+          // Créer des lignes parallèles pour séparer pairs/impairs
+          const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
+
+          // Ligne pour les numéros pairs (côté gauche, décalage négatif)
+          if (evenSegments.length > 0 && evenSegments.some(s => s.district_id)) {
+            const evenLine = createParallelLine(line, -8); // Décalage de 8 mètres à gauche
+            if (evenLine) {
+              divideLineIntoSegments(evenLine, evenSegments.filter(s => s.district_id));
+            }
           }
+
+          // Ligne pour les numéros impairs (côté droit, décalage positif)
+          if (oddSegments.length > 0 && oddSegments.some(s => s.district_id)) {
+            const oddLine = createParallelLine(line, 8); // Décalage de 8 mètres à droite
+            if (oddLine) {
+              divideLineIntoSegments(oddLine, oddSegments.filter(s => s.district_id));
+            }
+          }
+        } else if (shouldDivideBySegments) {
+          // Division simple par segments (sans séparation pairs/impairs)
+          const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
+          divideLineIntoSegments(line, sortedSegments);
         } else {
           // Comportement original : toute la rue d'une seule couleur
           const color = hasSelectedSegments ? SELECTED_COLOR : getStreetColor(street);
