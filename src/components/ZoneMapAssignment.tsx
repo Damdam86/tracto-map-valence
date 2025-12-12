@@ -86,6 +86,7 @@ const ZoneMapAssignment = () => {
   const [cutMarkers, setCutMarkers] = useState<[number, number][]>([]);
   const markersRef = useRef<L.Marker[]>([]);
   const editModeRef = useRef(false); // Ref pour accéder à editMode dans les event handlers
+  const editingStreetRef = useRef<Street | null>(null); // Ref pour accéder à editingStreet dans les event handlers
 
   const center: [number, number] = [44.8771, 4.8772];
   const defaultZoom = 15;
@@ -140,6 +141,11 @@ const ZoneMapAssignment = () => {
     editModeRef.current = editMode;
     console.log('🔄 editModeRef mis à jour:', editModeRef.current);
   }, [editMode]);
+
+  useEffect(() => {
+    editingStreetRef.current = editingStreet;
+    console.log('🔄 editingStreetRef mis à jour:', editingStreetRef.current?.name);
+  }, [editingStreet]);
 
   useEffect(() => {
     if (!mapRef.current || streets.length === 0) return;
@@ -719,10 +725,18 @@ const ZoneMapAssignment = () => {
   };
 
   const handleMapClick = (e: L.LeafletMouseEvent) => {
-    console.log('🗺️ handleMapClick appelé:', { editMode, editingStreet: editingStreet?.name, hasLatLng: !!e.latlng });
+    // IMPORTANT: Lire depuis les refs pour éviter les problèmes de closure!
+    const currentEditMode = editModeRef.current;
+    const currentEditingStreet = editingStreetRef.current;
 
-    if (!editMode || !editingStreet) {
-      console.log('❌ Conditions non remplies - editMode:', editMode, 'editingStreet:', editingStreet?.name);
+    console.log('🗺️ handleMapClick appelé:', {
+      editModeRef: currentEditMode,
+      editingStreetRef: currentEditingStreet?.name,
+      hasLatLng: !!e.latlng
+    });
+
+    if (!currentEditMode || !currentEditingStreet) {
+      console.log('❌ Conditions non remplies - editMode:', currentEditMode, 'editingStreet:', currentEditingStreet?.name);
       return;
     }
 
