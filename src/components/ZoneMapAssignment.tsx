@@ -130,6 +130,7 @@ const ZoneMapAssignment = () => {
   }, []);
 
   useEffect(() => {
+    console.log("🔧 ZoneMapAssignment loaded - Version with Mode découpe button");
     fetchData();
   }, []);
 
