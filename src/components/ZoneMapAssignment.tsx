@@ -258,6 +258,16 @@ const ZoneMapAssignment = () => {
         const uniqueZones = new Set(sortedSegments.map(s => s.district_id).filter(Boolean));
         const shouldDivideBySegments = uniqueZones.size > 1 && sortedSegments.length > 1 && !isMultiLineString;
 
+        console.log(`📍 ${street.name}:`, {
+          segments: sortedSegments.length,
+          evenSegments: evenSegments.length,
+          oddSegments: oddSegments.length,
+          hasMultipleSides,
+          shouldDivideBySegments,
+          uniqueZones: uniqueZones.size,
+          isMultiLineString
+        });
+
         // Fonction pour diviser une ligne en segments selon les zones
         const divideLineIntoSegments = (line: [number, number][], segments: Segment[]) => {
           if (segments.length === 0) return;
@@ -304,11 +314,17 @@ const ZoneMapAssignment = () => {
           // Créer des lignes parallèles pour séparer pairs/impairs
           const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
 
+          let parallelLinesCreated = false;
+
           // Ligne pour les numéros pairs (côté gauche, décalage négatif)
           if (evenSegments.length > 0 && evenSegments.some(s => s.district_id)) {
             const evenLine = createParallelLine(line, -8); // Décalage de 8 mètres à gauche
             if (evenLine) {
+              console.log(`  ↳ Ligne parallèle pairs créée pour ${street.name}`);
               divideLineIntoSegments(evenLine, evenSegments.filter(s => s.district_id));
+              parallelLinesCreated = true;
+            } else {
+              console.warn(`  ⚠️ Échec création ligne pairs pour ${street.name}`);
             }
           }
 
@@ -316,8 +332,18 @@ const ZoneMapAssignment = () => {
           if (oddSegments.length > 0 && oddSegments.some(s => s.district_id)) {
             const oddLine = createParallelLine(line, 8); // Décalage de 8 mètres à droite
             if (oddLine) {
+              console.log(`  ↳ Ligne parallèle impairs créée pour ${street.name}`);
               divideLineIntoSegments(oddLine, oddSegments.filter(s => s.district_id));
+              parallelLinesCreated = true;
+            } else {
+              console.warn(`  ⚠️ Échec création ligne impairs pour ${street.name}`);
             }
+          }
+
+          // Fallback : si les lignes parallèles n'ont pas pu être créées, afficher normalement
+          if (!parallelLinesCreated) {
+            console.log(`  ↳ Fallback: affichage normal pour ${street.name}`);
+            divideLineIntoSegments(line, sortedSegments);
           }
         } else if (shouldDivideBySegments) {
           // Division simple par segments (sans séparation pairs/impairs)
