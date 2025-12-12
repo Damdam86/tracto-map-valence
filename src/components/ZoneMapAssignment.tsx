@@ -563,14 +563,14 @@ const ZoneMapAssignment = () => {
       if (firstEven <= lastEven) {
         const { error: evenError } = await supabase
           .from("segments")
-          .insert({
+          .insert([{
             street_id: segment.street_id,
             number_start: firstEven,
             number_end: lastEven,
-            side: 'even',
-            building_type: segment.building_type,
+            side: 'even' as const,
+            building_type: segment.building_type as "buildings" | "houses" | "mixed",
             district_id: segment.district_id,
-          });
+          }]);
 
         if (evenError) throw evenError;
       }
@@ -579,14 +579,14 @@ const ZoneMapAssignment = () => {
       if (firstOdd <= lastOdd) {
         const { error: oddError } = await supabase
           .from("segments")
-          .insert({
+          .insert([{
             street_id: segment.street_id,
             number_start: firstOdd,
             number_end: lastOdd,
-            side: 'odd',
-            building_type: segment.building_type,
+            side: 'odd' as const,
+            building_type: segment.building_type as "buildings" | "houses" | "mixed",
             district_id: segment.district_id,
-          });
+          }]);
 
         if (oddError) throw oddError;
       }

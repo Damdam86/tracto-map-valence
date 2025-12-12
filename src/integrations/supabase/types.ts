@@ -170,6 +170,7 @@ export type Database = {
           building_type: Database["public"]["Enums"]["building_type"]
           created_at: string
           district_id: string | null
+          geometry: Json | null
           id: string
           notes: string | null
           number_end: number
@@ -182,6 +183,7 @@ export type Database = {
           building_type?: Database["public"]["Enums"]["building_type"]
           created_at?: string
           district_id?: string | null
+          geometry?: Json | null
           id?: string
           notes?: string | null
           number_end: number
@@ -194,6 +196,7 @@ export type Database = {
           building_type?: Database["public"]["Enums"]["building_type"]
           created_at?: string
           district_id?: string | null
+          geometry?: Json | null
           id?: string
           notes?: string | null
           number_end?: number
