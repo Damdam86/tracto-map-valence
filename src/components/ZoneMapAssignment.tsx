@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Check, MapPin, RefreshCw, Trash2, X, Split } from "lucide-react";
+import { Check, MapPin, RefreshCw, Trash2, X, Split, Scissors, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -79,6 +79,11 @@ const ZoneMapAssignment = () => {
   const [loading, setLoading] = useState(true);
   const mapRef = useRef<L.Map | null>(null);
   const polylinesRef = useRef<Map<string, L.Polyline[]>>(new Map());
+
+  // États pour le mode découpe
+  const [editMode, setEditMode] = useState(false);
+  const [cutMarkers, setCutMarkers] = useState<[number, number][]>([]);
+  const markersRef = useRef<L.Marker[]>([]);
 
   const center: [number, number] = [44.8771, 4.8772];
   const defaultZoom = 15;
@@ -636,6 +641,102 @@ const ZoneMapAssignment = () => {
     }
   };
 
+  const enterEditMode = () => {
+    if (!selectedStreetForSegments) return;
+
+    setEditMode(true);
+    setCutMarkers([]);
+    toast.info("Mode découpe activé - Cliquez sur la rue pour placer des marqueurs", { duration: 5000 });
+
+    // Activer le clic sur la carte
+    if (mapRef.current) {
+      mapRef.current.on('click', handleMapClick);
+    }
+  };
+
+  const exitEditMode = () => {
+    setEditMode(false);
+    setCutMarkers([]);
+
+    // Désactiver le clic sur la carte
+    if (mapRef.current) {
+      mapRef.current.off('click', handleMapClick);
+    }
+
+    // Supprimer tous les marqueurs
+    markersRef.current.forEach(marker => {
+      if (mapRef.current) {
+        mapRef.current.removeLayer(marker);
+      }
+    });
+    markersRef.current = [];
+
+    toast.info("Mode découpe désactivé");
+  };
+
+  const handleMapClick = (e: L.LeafletMouseEvent) => {
+    if (!editMode || !selectedStreetForSegments) return;
+
+    const clickPoint: [number, number] = [e.latlng.lat, e.latlng.lng];
+
+    // Ajouter le marqueur visuellement
+    const marker = L.marker(clickPoint, {
+      icon: L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+      }),
+      draggable: true
+    }).addTo(mapRef.current!);
+
+    // Permettre de supprimer le marqueur avec un clic droit
+    marker.on('contextmenu', () => {
+      if (mapRef.current) {
+        mapRef.current.removeLayer(marker);
+      }
+      const index = markersRef.current.indexOf(marker);
+      if (index > -1) {
+        markersRef.current.splice(index, 1);
+        setCutMarkers(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+
+    // Mettre à jour la position si déplacé
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      const index = markersRef.current.indexOf(marker);
+      if (index > -1) {
+        setCutMarkers(prev => {
+          const newMarkers = [...prev];
+          newMarkers[index] = [pos.lat, pos.lng];
+          return newMarkers;
+        });
+      }
+    });
+
+    markersRef.current.push(marker);
+    setCutMarkers(prev => [...prev, clickPoint]);
+  };
+
+  const saveCutSegments = async () => {
+    if (!selectedStreetForSegments || cutMarkers.length === 0) {
+      toast.error("Placez au moins un marqueur sur la rue");
+      return;
+    }
+
+    try {
+      // TODO: Implémenter la logique de découpe et de sauvegarde
+      toast.info("Fonctionnalité en cours de développement...");
+      exitEditMode();
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la sauvegarde:", error);
+      toast.error("Erreur lors de la sauvegarde des découpes");
+    }
+  };
+
   const getSideLabel = (side: string) => {
     const labels: Record<string, string> = {
       even: "Pairs",
@@ -803,18 +904,55 @@ const ZoneMapAssignment = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>{selectedStreetForSegments?.name}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => selectedStreetForSegments && handleDeleteStreet(selectedStreetForSegments.id)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Supprimer la rue
-              </Button>
+              <div className="flex gap-2">
+                {!editMode ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={enterEditMode}
+                      className="text-primary"
+                    >
+                      <Scissors className="w-4 h-4 mr-1" />
+                      Mode découpe
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => selectedStreetForSegments && handleDeleteStreet(selectedStreetForSegments.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Supprimer la rue
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={saveCutSegments}
+                      disabled={cutMarkers.length === 0}
+                    >
+                      <Save className="w-4 h-4 mr-1" />
+                      Sauvegarder ({cutMarkers.length} marqueurs)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exitEditMode}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Annuler
+                    </Button>
+                  </>
+                )}
+              </div>
             </DialogTitle>
             <DialogDescription>
-              Sélectionnez les segments à assigner à une zone
+              {editMode
+                ? "Cliquez sur la carte pour placer des marqueurs de découpe. Clic droit sur un marqueur pour le supprimer."
+                : "Sélectionnez les segments à assigner à une zone"}
             </DialogDescription>
           </DialogHeader>
 
