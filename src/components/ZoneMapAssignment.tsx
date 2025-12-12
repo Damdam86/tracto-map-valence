@@ -82,6 +82,7 @@ const ZoneMapAssignment = () => {
 
   // États pour le mode découpe
   const [editMode, setEditMode] = useState(false);
+  const [editingStreet, setEditingStreet] = useState<Street | null>(null);
   const [cutMarkers, setCutMarkers] = useState<[number, number][]>([]);
   const markersRef = useRef<L.Marker[]>([]);
 
@@ -645,9 +646,16 @@ const ZoneMapAssignment = () => {
   const enterEditMode = () => {
     if (!selectedStreetForSegments) return;
 
+    // Sauvegarder la rue en cours d'édition
+    setEditingStreet(selectedStreetForSegments);
     setEditMode(true);
     setCutMarkers([]);
-    toast.info("Mode découpe activé - Cliquez sur la rue pour placer des marqueurs", { duration: 5000 });
+
+    // Fermer le dialog pour permettre de cliquer sur la carte
+    const streetName = selectedStreetForSegments.name;
+    setSelectedStreetForSegments(null);
+
+    toast.info(`Mode découpe activé pour ${streetName} - Cliquez sur la rue pour placer des marqueurs. Faites un clic droit sur un marqueur pour le supprimer.`, { duration: 8000 });
 
     // Activer le clic sur la carte
     if (mapRef.current) {
@@ -657,6 +665,7 @@ const ZoneMapAssignment = () => {
 
   const exitEditMode = () => {
     setEditMode(false);
+    setEditingStreet(null);
     setCutMarkers([]);
 
     // Désactiver le clic sur la carte
@@ -676,7 +685,7 @@ const ZoneMapAssignment = () => {
   };
 
   const handleMapClick = (e: L.LeafletMouseEvent) => {
-    if (!editMode || !selectedStreetForSegments) return;
+    if (!editMode || !editingStreet) return;
 
     const clickPoint: [number, number] = [e.latlng.lat, e.latlng.lng];
 
@@ -723,7 +732,7 @@ const ZoneMapAssignment = () => {
   };
 
   const saveCutSegments = async () => {
-    if (!selectedStreetForSegments || cutMarkers.length === 0) {
+    if (!editingStreet || cutMarkers.length === 0) {
       toast.error("Placez au moins un marqueur sur la rue");
       return;
     }
@@ -883,6 +892,39 @@ const ZoneMapAssignment = () => {
                   <p className="text-sm text-muted-foreground">
                     Allez dans <strong>"Import rues"</strong> dans le menu de navigation.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Boutons flottants en mode découpe */}
+            {editMode && editingStreet && (
+              <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                <div className="bg-background/95 backdrop-blur-sm p-3 rounded-lg shadow-lg border">
+                  <p className="text-sm font-medium mb-2">✂️ Mode découpe: {editingStreet.name}</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {cutMarkers.length} marqueur{cutMarkers.length > 1 ? 's' : ''} placé{cutMarkers.length > 1 ? 's' : ''}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={saveCutSegments}
+                      disabled={cutMarkers.length === 0}
+                      className="w-full"
+                    >
+                      <Save className="w-4 h-4 mr-1" />
+                      Sauvegarder
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exitEditMode}
+                      className="w-full"
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Annuler
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
