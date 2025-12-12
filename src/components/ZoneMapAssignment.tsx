@@ -228,7 +228,7 @@ const ZoneMapAssignment = () => {
 
         // Vérifier si on doit diviser la rue par segments
         const uniqueZones = new Set(sortedSegments.map(s => s.district_id).filter(Boolean));
-        const shouldDivideBySegments = uniqueZones.size > 1 && sortedSegments.length > 1;
+        const shouldDivideBySegments = uniqueZones.size > 1 && sortedSegments.length > 1 && !isMultiLineString;
 
         if (shouldDivideBySegments) {
           // Fonction pour diviser une ligne en segments
