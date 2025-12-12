@@ -138,6 +138,7 @@ const ZoneMapAssignment = () => {
 
   useEffect(() => {
     editModeRef.current = editMode;
+    console.log('🔄 editModeRef mis à jour:', editModeRef.current);
   }, [editMode]);
 
   useEffect(() => {
@@ -312,11 +313,14 @@ const ZoneMapAssignment = () => {
               polyline.bindTooltip(tooltipText, { direction: 'top' });
 
               polyline.on('click', (e) => {
+                console.log('🖱️ Clic sur polyline:', { editModeRef: editModeRef.current, street: street.name });
                 if (editModeRef.current) {
                   // En mode découpe, placer un marqueur
+                  console.log('✂️ Mode découpe actif - placement marqueur');
                   handleMapClick(e);
                 } else {
                   // Sinon, ouvrir le dialog
+                  console.log('📋 Mode normal - ouverture dialog');
                   L.DomEvent.stopPropagation(e);
                   handleStreetClick(street);
                 }
@@ -407,11 +411,14 @@ const ZoneMapAssignment = () => {
               polyline.bindTooltip(tooltipText, { direction: 'top' });
 
               polyline.on('click', (e) => {
+                console.log('🖱️ Clic sur polyline:', { editModeRef: editModeRef.current, street: street.name });
                 if (editModeRef.current) {
                   // En mode découpe, placer un marqueur
+                  console.log('✂️ Mode découpe actif - placement marqueur');
                   handleMapClick(e);
                 } else {
                   // Sinon, ouvrir le dialog
+                  console.log('📋 Mode normal - ouverture dialog');
                   L.DomEvent.stopPropagation(e);
                   handleStreetClick(street);
                 }
@@ -669,6 +676,8 @@ const ZoneMapAssignment = () => {
   const enterEditMode = () => {
     if (!selectedStreetForSegments) return;
 
+    console.log('✂️ Entrée en mode découpe pour:', selectedStreetForSegments.name);
+
     // Sauvegarder la rue en cours d'édition
     setEditingStreet(selectedStreetForSegments);
     setEditMode(true);
@@ -677,6 +686,8 @@ const ZoneMapAssignment = () => {
     // Fermer le dialog pour permettre de cliquer sur la carte
     const streetName = selectedStreetForSegments.name;
     setSelectedStreetForSegments(null);
+
+    console.log('✂️ editMode défini à true, editingStreet:', streetName);
 
     toast.info(`Mode découpe activé pour ${streetName} - Cliquez sur la rue pour placer des marqueurs. Faites un clic droit sur un marqueur pour le supprimer.`, { duration: 8000 });
 
@@ -708,9 +719,15 @@ const ZoneMapAssignment = () => {
   };
 
   const handleMapClick = (e: L.LeafletMouseEvent) => {
-    if (!editMode || !editingStreet) return;
+    console.log('🗺️ handleMapClick appelé:', { editMode, editingStreet: editingStreet?.name, hasLatLng: !!e.latlng });
+
+    if (!editMode || !editingStreet) {
+      console.log('❌ Conditions non remplies - editMode:', editMode, 'editingStreet:', editingStreet?.name);
+      return;
+    }
 
     const clickPoint: [number, number] = [e.latlng.lat, e.latlng.lng];
+    console.log('📍 Placement marqueur à:', clickPoint);
 
     // Ajouter le marqueur visuellement
     const marker = L.marker(clickPoint, {
