@@ -518,7 +518,7 @@ const ZoneMapAssignment = () => {
       </Card>
 
       <Dialog open={selectedStreetForSegments !== null} onOpenChange={(open) => !open && setSelectedStreetForSegments(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>{selectedStreetForSegments?.name}</span>
