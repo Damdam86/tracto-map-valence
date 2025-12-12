@@ -310,40 +310,62 @@ const ZoneMapAssignment = () => {
           });
         };
 
-        if (hasMultipleSides && !isMultiLineString) {
+        if (hasMultipleSides) {
           // Créer des lignes parallèles pour séparer pairs/impairs
-          const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
-
           let parallelLinesCreated = false;
 
-          // Ligne pour les numéros pairs (côté gauche, décalage négatif)
-          if (evenSegments.length > 0 && evenSegments.some(s => s.district_id)) {
-            const evenLine = createParallelLine(line, -8); // Décalage de 8 mètres à gauche
-            if (evenLine) {
-              console.log(`  ↳ Ligne parallèle pairs créée pour ${street.name}`);
-              divideLineIntoSegments(evenLine, evenSegments.filter(s => s.district_id));
-              parallelLinesCreated = true;
-            } else {
-              console.warn(`  ⚠️ Échec création ligne pairs pour ${street.name}`);
+          const processLine = (line: [number, number][]) => {
+            // Ligne pour les numéros pairs (côté gauche, décalage négatif)
+            if (evenSegments.length > 0 && evenSegments.some(s => s.district_id)) {
+              const evenLine = createParallelLine(line, -8);
+              if (evenLine) {
+                console.log(`  ↳ Ligne parallèle pairs créée pour ${street.name}`);
+                divideLineIntoSegments(evenLine, evenSegments.filter(s => s.district_id));
+                parallelLinesCreated = true;
+              } else {
+                console.warn(`  ⚠️ Échec création ligne pairs pour ${street.name}`);
+              }
             }
-          }
 
-          // Ligne pour les numéros impairs (côté droit, décalage positif)
-          if (oddSegments.length > 0 && oddSegments.some(s => s.district_id)) {
-            const oddLine = createParallelLine(line, 8); // Décalage de 8 mètres à droite
-            if (oddLine) {
-              console.log(`  ↳ Ligne parallèle impairs créée pour ${street.name}`);
-              divideLineIntoSegments(oddLine, oddSegments.filter(s => s.district_id));
-              parallelLinesCreated = true;
-            } else {
-              console.warn(`  ⚠️ Échec création ligne impairs pour ${street.name}`);
+            // Ligne pour les numéros impairs (côté droit, décalage positif)
+            if (oddSegments.length > 0 && oddSegments.some(s => s.district_id)) {
+              const oddLine = createParallelLine(line, 8);
+              if (oddLine) {
+                console.log(`  ↳ Ligne parallèle impairs créée pour ${street.name}`);
+                divideLineIntoSegments(oddLine, oddSegments.filter(s => s.district_id));
+                parallelLinesCreated = true;
+              } else {
+                console.warn(`  ⚠️ Échec création ligne impairs pour ${street.name}`);
+              }
             }
+          };
+
+          if (isMultiLineString) {
+            // Pour MultiLineString, traiter chaque way séparément
+            const ways = coords as number[][][];
+            ways.forEach((way) => {
+              const line: [number, number][] = way.map(coord => [coord[0], coord[1]]);
+              processLine(line);
+            });
+          } else {
+            // Pour LineString simple
+            const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
+            processLine(line);
           }
 
           // Fallback : si les lignes parallèles n'ont pas pu être créées, afficher normalement
           if (!parallelLinesCreated) {
             console.log(`  ↳ Fallback: affichage normal pour ${street.name}`);
-            divideLineIntoSegments(line, sortedSegments);
+            if (isMultiLineString) {
+              const ways = coords as number[][][];
+              ways.forEach((way) => {
+                const line: [number, number][] = way.map(coord => [coord[0], coord[1]]);
+                divideLineIntoSegments(line, sortedSegments);
+              });
+            } else {
+              const line: [number, number][] = (coords as number[][]).map(coord => [coord[0], coord[1]]);
+              divideLineIntoSegments(line, sortedSegments);
+            }
           }
         } else if (shouldDivideBySegments) {
           // Division simple par segments (sans séparation pairs/impairs)
