@@ -85,6 +85,7 @@ const ZoneMapAssignment = () => {
   const [editingStreet, setEditingStreet] = useState<Street | null>(null);
   const [cutMarkers, setCutMarkers] = useState<[number, number][]>([]);
   const markersRef = useRef<L.Marker[]>([]);
+  const editModeRef = useRef(false); // Ref pour accéder à editMode dans les event handlers
 
   const center: [number, number] = [44.8771, 4.8772];
   const defaultZoom = 15;
@@ -134,6 +135,10 @@ const ZoneMapAssignment = () => {
     console.log("🔧 ZoneMapAssignment loaded - Version with Mode découpe button");
     fetchData();
   }, []);
+
+  useEffect(() => {
+    editModeRef.current = editMode;
+  }, [editMode]);
 
   useEffect(() => {
     if (!mapRef.current || streets.length === 0) return;
@@ -307,8 +312,14 @@ const ZoneMapAssignment = () => {
               polyline.bindTooltip(tooltipText, { direction: 'top' });
 
               polyline.on('click', (e) => {
-                L.DomEvent.stopPropagation(e);
-                handleStreetClick(street);
+                if (editModeRef.current) {
+                  // En mode découpe, placer un marqueur
+                  handleMapClick(e);
+                } else {
+                  // Sinon, ouvrir le dialog
+                  L.DomEvent.stopPropagation(e);
+                  handleStreetClick(street);
+                }
               });
 
               streetPolylines.push(polyline);
@@ -396,8 +407,14 @@ const ZoneMapAssignment = () => {
               polyline.bindTooltip(tooltipText, { direction: 'top' });
 
               polyline.on('click', (e) => {
-                L.DomEvent.stopPropagation(e);
-                handleStreetClick(street);
+                if (editModeRef.current) {
+                  // En mode découpe, placer un marqueur
+                  handleMapClick(e);
+                } else {
+                  // Sinon, ouvrir le dialog
+                  L.DomEvent.stopPropagation(e);
+                  handleStreetClick(street);
+                }
               });
 
               streetPolylines.push(polyline);
@@ -409,8 +426,14 @@ const ZoneMapAssignment = () => {
             polyline.bindTooltip(tooltipText, { direction: 'top' });
 
             polyline.on('click', (e) => {
-              L.DomEvent.stopPropagation(e);
-              handleStreetClick(street);
+              if (editModeRef.current) {
+                // En mode découpe, placer un marqueur
+                handleMapClick(e);
+              } else {
+                // Sinon, ouvrir le dialog
+                L.DomEvent.stopPropagation(e);
+                handleStreetClick(street);
+              }
             });
 
             streetPolylines.push(polyline);
