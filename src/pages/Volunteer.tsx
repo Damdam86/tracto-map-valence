@@ -56,6 +56,9 @@ const Volunteer = () => {
 
       const userTeamIds = teamMemberships?.map(tm => tm.team_id) || [];
 
+      console.log("DEBUG - User ID:", user.id);
+      console.log("DEBUG - User teams:", userTeamIds);
+
       // Fetch team names
       if (userTeamIds.length > 0) {
         const { data: teamsData } = await supabase
@@ -68,9 +71,13 @@ const Volunteer = () => {
           teamNamesMap[team.id] = team.name;
         });
         setTeamNames(teamNamesMap);
+        console.log("DEBUG - Team names:", teamNamesMap);
       }
 
       // Fetch segments assigned to the user OR to any of their teams
+      const queryFilter = `assigned_to_user_id.eq.${user.id}${userTeamIds.length > 0 ? `,assigned_to_team_id.in.(${userTeamIds.join(',')})` : ''}`;
+      console.log("DEBUG - Query filter:", queryFilter);
+
       const { data, error } = await supabase
         .from("campaign_segments")
         .select(`
@@ -87,12 +94,17 @@ const Volunteer = () => {
             street:streets(name, type)
           )
         `)
-        .or(`assigned_to_user_id.eq.${user.id}${userTeamIds.length > 0 ? `,assigned_to_team_id.in.(${userTeamIds.join(',')})` : ''}`)
+        .or(queryFilter)
         .order("status");
 
       if (error) throw error;
+
+      console.log("DEBUG - Segments found:", data?.length || 0);
+      console.log("DEBUG - Segments data:", data);
+
       setSegments(data || []);
     } catch (error: any) {
+      console.error("DEBUG - Error:", error);
       toast.error("Erreur lors du chargement de vos segments");
     } finally {
       setLoading(false);
