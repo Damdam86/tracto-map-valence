@@ -18,6 +18,7 @@ import ImportStreets from "./pages/ImportStreets";
 import Users from "./pages/Users";
 import Invitations from "./pages/Invitations";
 import Districts from "./pages/Districts";
+import DebugTeams from "./pages/DebugTeams";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
           <Route path="/users" element={<Layout><Users /></Layout>} />
           <Route path="/invitations" element={<Layout><Invitations /></Layout>} />
           <Route path="/districts" element={<Layout><Districts /></Layout>} />
+          <Route path="/debug-teams" element={<Layout><DebugTeams /></Layout>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
