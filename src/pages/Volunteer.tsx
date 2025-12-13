@@ -11,6 +11,8 @@ import { CheckCircle2, Circle, AlertCircle, Clock } from "lucide-react";
 interface AssignedSegment {
   id: string;
   status: string;
+  assigned_to_user_id: string | null;
+  assigned_to_team_id: string | null;
   campaign: {
     name: string;
     description: string;
@@ -32,6 +34,7 @@ const Volunteer = () => {
   const [segments, setSegments] = useState<AssignedSegment[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingSegment, setUpdatingSegment] = useState<string | null>(null);
+  const [teamNames, setTeamNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user) {
@@ -43,11 +46,38 @@ const Volunteer = () => {
     if (!user) return;
 
     try {
+      // First, get the teams the user is a member of
+      const { data: teamMemberships, error: teamError } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user.id);
+
+      if (teamError) throw teamError;
+
+      const userTeamIds = teamMemberships?.map(tm => tm.team_id) || [];
+
+      // Fetch team names
+      if (userTeamIds.length > 0) {
+        const { data: teamsData } = await supabase
+          .from("teams")
+          .select("id, name")
+          .in("id", userTeamIds);
+
+        const teamNamesMap: Record<string, string> = {};
+        teamsData?.forEach(team => {
+          teamNamesMap[team.id] = team.name;
+        });
+        setTeamNames(teamNamesMap);
+      }
+
+      // Fetch segments assigned to the user OR to any of their teams
       const { data, error } = await supabase
         .from("campaign_segments")
         .select(`
           id,
           status,
+          assigned_to_user_id,
+          assigned_to_team_id,
           campaign:campaigns(name, description),
           segment:segments(
             id,
@@ -57,7 +87,7 @@ const Volunteer = () => {
             street:streets(name, type)
           )
         `)
-        .eq("assigned_to_user_id", user.id)
+        .or(`assigned_to_user_id.eq.${user.id}${userTeamIds.length > 0 ? `,assigned_to_team_id.in.(${userTeamIds.join(',')})` : ''}`)
         .order("status");
 
       if (error) throw error;
@@ -200,11 +230,27 @@ const Volunteer = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium mb-1">Campagne</p>
-                  <p className="text-sm text-muted-foreground">
-                    {item.campaign.name}
-                  </p>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-medium mb-1">Campagne</p>
+                    <p className="text-sm text-muted-foreground">
+                      {item.campaign.name}
+                    </p>
+                  </div>
+                  {item.assigned_to_team_id && teamNames[item.assigned_to_team_id] && (
+                    <div>
+                      <Badge variant="secondary" className="text-xs">
+                        👥 Mission d'équipe : {teamNames[item.assigned_to_team_id]}
+                      </Badge>
+                    </div>
+                  )}
+                  {item.assigned_to_user_id && !item.assigned_to_team_id && (
+                    <div>
+                      <Badge variant="outline" className="text-xs">
+                        👤 Mission personnelle
+                      </Badge>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
