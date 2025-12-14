@@ -806,15 +806,47 @@ const ZoneMapAssignment = () => {
     try {
       console.log("✂️ Début de la sauvegarde des découpes");
       console.log("Marqueurs placés:", cutMarkers);
-      console.log("Coordonnées de la rue:", editingStreet.coordinates);
+      console.log("Coordonnées de la rue (brutes):", editingStreet.coordinates);
+      console.log("Premier élément:", editingStreet.coordinates[0]);
 
-      // Convertir les coordonnées de la rue en format GeoJSON pour turf
-      const streetCoords = editingStreet.coordinates.map((coord: number[]) => [coord[1], coord[0]]); // [lon, lat]
+      // Normaliser les coordonnées de la rue pour turf.js
+      const normalizeCoords = (coords: any): [number, number][] => {
+        if (!coords || coords.length === 0) return [];
+
+        return coords.map((coord: any, index: number) => {
+          // Si c'est un objet avec lat/lng
+          if (typeof coord === 'object' && !Array.isArray(coord)) {
+            const lat = coord.lat || coord.latitude || coord[0];
+            const lng = coord.lng || coord.lon || coord.longitude || coord[1];
+            console.log(`Coord ${index}: objet {lat: ${lat}, lng: ${lng}}`);
+            return [Number(lng), Number(lat)]; // [lon, lat] for GeoJSON
+          }
+
+          // Si c'est un array [lat, lon]
+          if (Array.isArray(coord) && coord.length >= 2) {
+            console.log(`Coord ${index}: array [${coord[0]}, ${coord[1]}]`);
+            return [Number(coord[1]), Number(coord[0])]; // [lon, lat] for GeoJSON
+          }
+
+          console.error(`Coord ${index}: format invalide`, coord);
+          throw new Error(`Format de coordonnée invalide à l'index ${index}`);
+        });
+      };
+
+      const streetCoords = normalizeCoords(editingStreet.coordinates);
+      console.log("✅ Coordonnées normalisées:", streetCoords);
+
+      if (streetCoords.length === 0) {
+        toast.error("Les coordonnées de la rue sont invalides");
+        return;
+      }
+
       const streetLine = turf.lineString(streetCoords);
 
       // Pour chaque marqueur, calculer sa distance le long de la ligne de la rue
-      const markersWithDistance = cutMarkers.map(marker => {
-        const point = turf.point([marker[1], marker[0]]); // [lon, lat]
+      const markersWithDistance = cutMarkers.map((marker, index) => {
+        console.log(`Traitement marqueur ${index}:`, marker);
+        const point = turf.point([Number(marker[1]), Number(marker[0])]); // [lon, lat]
         const snapped = turf.nearestPointOnLine(streetLine, point);
         return {
           coords: marker,
@@ -834,10 +866,23 @@ const ZoneMapAssignment = () => {
         numberEnd: string;
       }> = [];
 
+      // Normaliser une coordonnée unique pour obtenir [lat, lon] (format Leaflet)
+      const normalizeCoord = (coord: any): [number, number] => {
+        if (typeof coord === 'object' && !Array.isArray(coord)) {
+          const lat = coord.lat || coord.latitude || coord[0];
+          const lng = coord.lng || coord.lon || coord.longitude || coord[1];
+          return [Number(lat), Number(lng)];
+        }
+        if (Array.isArray(coord) && coord.length >= 2) {
+          return [Number(coord[0]), Number(coord[1])];
+        }
+        return [0, 0];
+      };
+
       // Ajouter un segment du début de la rue au premier marqueur
-      const streetStart = editingStreet.coordinates[0];
+      const streetStart = normalizeCoord(editingStreet.coordinates[0]);
       segments.push({
-        start: [streetStart[0], streetStart[1]],
+        start: streetStart,
         end: markersWithDistance[0].coords,
         numberStart: "",
         numberEnd: ""
@@ -854,10 +899,10 @@ const ZoneMapAssignment = () => {
       }
 
       // Ajouter un segment du dernier marqueur à la fin de la rue
-      const streetEnd = editingStreet.coordinates[editingStreet.coordinates.length - 1];
+      const streetEnd = normalizeCoord(editingStreet.coordinates[editingStreet.coordinates.length - 1]);
       segments.push({
         start: markersWithDistance[markersWithDistance.length - 1].coords,
-        end: [streetEnd[0], streetEnd[1]],
+        end: streetEnd,
         numberStart: "",
         numberEnd: ""
       });
