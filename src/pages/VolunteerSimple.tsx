@@ -56,6 +56,19 @@ const VolunteerSimple = () => {
     if (!user) return;
 
     try {
+      // First, get the teams the user is a member of
+      const { data: teamMemberships, error: teamError } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user.id);
+
+      if (teamError) throw teamError;
+
+      const userTeamIds = teamMemberships?.map(tm => tm.team_id) || [];
+
+      // Build the query filter to include both personal and team assignments
+      const queryFilter = `assigned_to_user_id.eq.${user.id}${userTeamIds.length > 0 ? `,assigned_to_team_id.in.(${userTeamIds.join(',')})` : ''}`;
+
       const { data, error } = await supabase
         .from("campaign_segments")
         .select(`
@@ -70,7 +83,7 @@ const VolunteerSimple = () => {
             street:streets(name, type)
           )
         `)
-        .eq("assigned_to_user_id", user.id)
+        .or(queryFilter)
         .order("status");
 
       if (error) throw error;
