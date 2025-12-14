@@ -813,28 +813,60 @@ const ZoneMapAssignment = () => {
       const normalizeCoords = (coords: any): [number, number][] => {
         if (!coords || coords.length === 0) return [];
 
-        return coords.map((coord: any, index: number) => {
+        const result: [number, number][] = [];
+
+        const processCoord = (coord: any): [number, number] | null => {
           // Si c'est un objet avec lat/lng
           if (typeof coord === 'object' && !Array.isArray(coord)) {
-            const lat = coord.lat || coord.latitude || coord[0];
-            const lng = coord.lng || coord.lon || coord.longitude || coord[1];
-            console.log(`Coord ${index}: objet {lat: ${lat}, lng: ${lng}}`);
-            return [Number(lng), Number(lat)]; // [lon, lat] for GeoJSON
+            const lat = coord.lat || coord.latitude;
+            const lng = coord.lng || coord.lon || coord.longitude;
+            if (lat !== undefined && lng !== undefined) {
+              return [Number(lng), Number(lat)]; // [lon, lat] for GeoJSON
+            }
           }
 
-          // Si c'est un array [lat, lon]
-          if (Array.isArray(coord) && coord.length >= 2) {
-            console.log(`Coord ${index}: array [${coord[0]}, ${coord[1]}]`);
+          // Si c'est un array de 2 nombres [lat, lon]
+          if (Array.isArray(coord) && coord.length === 2 && typeof coord[0] === 'number' && typeof coord[1] === 'number') {
             return [Number(coord[1]), Number(coord[0])]; // [lon, lat] for GeoJSON
           }
 
-          console.error(`Coord ${index}: format invalide`, coord);
-          throw new Error(`Format de coordonnée invalide à l'index ${index}`);
-        });
+          // Si c'est un array qui contient d'autres arrays (MultiLineString)
+          if (Array.isArray(coord) && coord.length > 0 && Array.isArray(coord[0])) {
+            // C'est un array de lignes, aplatir récursivement
+            return null; // On va le traiter séparément
+          }
+
+          return null;
+        };
+
+        for (let i = 0; i < coords.length; i++) {
+          const coord = coords[i];
+
+          // Si c'est un array d'arrays (MultiLineString ou LineString)
+          if (Array.isArray(coord) && coord.length > 0 && Array.isArray(coord[0])) {
+            console.log(`Coord ${i}: MultiLineString avec ${coord.length} points`);
+            // Aplatir et traiter chaque sous-point
+            for (let j = 0; j < coord.length; j++) {
+              const processed = processCoord(coord[j]);
+              if (processed) {
+                result.push(processed);
+              }
+            }
+          } else {
+            // C'est un simple point
+            const processed = processCoord(coord);
+            if (processed) {
+              console.log(`Coord ${i}: point [${processed[1]}, ${processed[0]}]`);
+              result.push(processed);
+            }
+          }
+        }
+
+        return result;
       };
 
       const streetCoords = normalizeCoords(editingStreet.coordinates);
-      console.log("✅ Coordonnées normalisées:", streetCoords);
+      console.log("✅ Coordonnées normalisées:", streetCoords.length, "points");
 
       if (streetCoords.length === 0) {
         toast.error("Les coordonnées de la rue sont invalides");
@@ -868,19 +900,31 @@ const ZoneMapAssignment = () => {
 
       // Normaliser une coordonnée unique pour obtenir [lat, lon] (format Leaflet)
       const normalizeCoord = (coord: any): [number, number] => {
-        if (typeof coord === 'object' && !Array.isArray(coord)) {
-          const lat = coord.lat || coord.latitude || coord[0];
-          const lng = coord.lng || coord.lon || coord.longitude || coord[1];
-          return [Number(lat), Number(lng)];
+        // Si c'est un array d'arrays (MultiLineString), prendre le premier point
+        if (Array.isArray(coord) && coord.length > 0 && Array.isArray(coord[0])) {
+          return normalizeCoord(coord[0]); // Récursion pour obtenir le premier point
         }
-        if (Array.isArray(coord) && coord.length >= 2) {
+
+        // Si c'est un objet avec lat/lng
+        if (typeof coord === 'object' && !Array.isArray(coord)) {
+          const lat = coord.lat || coord.latitude;
+          const lng = coord.lng || coord.lon || coord.longitude;
+          if (lat !== undefined && lng !== undefined) {
+            return [Number(lat), Number(lng)];
+          }
+        }
+
+        // Si c'est un array [lat, lon]
+        if (Array.isArray(coord) && coord.length === 2 && typeof coord[0] === 'number' && typeof coord[1] === 'number') {
           return [Number(coord[0]), Number(coord[1])];
         }
+
         return [0, 0];
       };
 
       // Ajouter un segment du début de la rue au premier marqueur
       const streetStart = normalizeCoord(editingStreet.coordinates[0]);
+      console.log("📍 Début de rue:", streetStart);
       segments.push({
         start: streetStart,
         end: markersWithDistance[0].coords,
@@ -899,7 +943,20 @@ const ZoneMapAssignment = () => {
       }
 
       // Ajouter un segment du dernier marqueur à la fin de la rue
-      const streetEnd = normalizeCoord(editingStreet.coordinates[editingStreet.coordinates.length - 1]);
+      // Pour la fin, on doit prendre le dernier point du dernier array
+      const getLastCoord = (coords: any): any => {
+        if (Array.isArray(coords) && coords.length > 0) {
+          const last = coords[coords.length - 1];
+          if (Array.isArray(last) && last.length > 0 && Array.isArray(last[0])) {
+            return getLastCoord(last);
+          }
+          return last;
+        }
+        return coords;
+      };
+
+      const streetEnd = normalizeCoord(getLastCoord(editingStreet.coordinates));
+      console.log("📍 Fin de rue:", streetEnd);
       segments.push({
         start: markersWithDistance[markersWithDistance.length - 1].coords,
         end: streetEnd,
