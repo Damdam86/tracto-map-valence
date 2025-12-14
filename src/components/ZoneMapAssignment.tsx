@@ -84,6 +84,13 @@ const ZoneMapAssignment = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingStreet, setEditingStreet] = useState<Street | null>(null);
   const [cutMarkers, setCutMarkers] = useState<[number, number][]>([]);
+  const [showSegmentNumbersDialog, setShowSegmentNumbersDialog] = useState(false);
+  const [newSegmentsData, setNewSegmentsData] = useState<Array<{
+    start: [number, number];
+    end: [number, number];
+    numberStart: string;
+    numberEnd: string;
+  }>>([]);
   const markersRef = useRef<L.Marker[]>([]);
   const editModeRef = useRef(false); // Ref pour accéder à editMode dans les event handlers
   const editingStreetRef = useRef<Street | null>(null); // Ref pour accéder à editingStreet dans les event handlers
@@ -791,13 +798,128 @@ const ZoneMapAssignment = () => {
       return;
     }
 
+    if (!editingStreet.coordinates || editingStreet.coordinates.length === 0) {
+      toast.error("Cette rue n'a pas de coordonnées GPS");
+      return;
+    }
+
     try {
-      // TODO: Implémenter la logique de découpe et de sauvegarde
-      toast.info("Fonctionnalité en cours de développement...");
+      console.log("✂️ Début de la sauvegarde des découpes");
+      console.log("Marqueurs placés:", cutMarkers);
+      console.log("Coordonnées de la rue:", editingStreet.coordinates);
+
+      // Convertir les coordonnées de la rue en format GeoJSON pour turf
+      const streetCoords = editingStreet.coordinates.map((coord: number[]) => [coord[1], coord[0]]); // [lon, lat]
+      const streetLine = turf.lineString(streetCoords);
+
+      // Pour chaque marqueur, calculer sa distance le long de la ligne de la rue
+      const markersWithDistance = cutMarkers.map(marker => {
+        const point = turf.point([marker[1], marker[0]]); // [lon, lat]
+        const snapped = turf.nearestPointOnLine(streetLine, point);
+        return {
+          coords: marker,
+          distance: snapped.properties.location
+        };
+      });
+
+      // Trier les marqueurs par distance le long de la rue
+      markersWithDistance.sort((a, b) => a.distance - b.distance);
+      console.log("Marqueurs triés:", markersWithDistance);
+
+      // Créer les segments entre les marqueurs
+      const segments: Array<{
+        start: [number, number];
+        end: [number, number];
+        numberStart: string;
+        numberEnd: string;
+      }> = [];
+
+      // Ajouter un segment du début de la rue au premier marqueur
+      const streetStart = editingStreet.coordinates[0];
+      segments.push({
+        start: [streetStart[0], streetStart[1]],
+        end: markersWithDistance[0].coords,
+        numberStart: "",
+        numberEnd: ""
+      });
+
+      // Ajouter les segments entre chaque paire de marqueurs
+      for (let i = 0; i < markersWithDistance.length - 1; i++) {
+        segments.push({
+          start: markersWithDistance[i].coords,
+          end: markersWithDistance[i + 1].coords,
+          numberStart: "",
+          numberEnd: ""
+        });
+      }
+
+      // Ajouter un segment du dernier marqueur à la fin de la rue
+      const streetEnd = editingStreet.coordinates[editingStreet.coordinates.length - 1];
+      segments.push({
+        start: markersWithDistance[markersWithDistance.length - 1].coords,
+        end: [streetEnd[0], streetEnd[1]],
+        numberStart: "",
+        numberEnd: ""
+      });
+
+      console.log("Segments créés:", segments);
+      setNewSegmentsData(segments);
+      setShowSegmentNumbersDialog(true);
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la préparation des découpes:", error);
+      toast.error("Erreur lors de la préparation des découpes: " + error.message);
+    }
+  };
+
+  const confirmAndSaveSegments = async () => {
+    if (!editingStreet) return;
+
+    try {
+      console.log("💾 Sauvegarde des segments dans la base de données");
+
+      // Valider que tous les numéros sont remplis
+      for (const segment of newSegmentsData) {
+        if (!segment.numberStart || !segment.numberEnd) {
+          toast.error("Veuillez remplir tous les numéros de début et de fin");
+          return;
+        }
+        const start = parseInt(segment.numberStart);
+        const end = parseInt(segment.numberEnd);
+        if (isNaN(start) || isNaN(end) || start > end) {
+          toast.error("Les numéros doivent être valides et le début doit être inférieur à la fin");
+          return;
+        }
+      }
+
+      // Créer les nouveaux segments dans la base de données
+      for (const segment of newSegmentsData) {
+        // Créer la géométrie du segment (ligne entre start et end)
+        const geometry = {
+          type: "LineString",
+          coordinates: [segment.start, segment.end]
+        };
+
+        const { error } = await supabase
+          .from("segments")
+          .insert({
+            street_id: editingStreet.id,
+            number_start: parseInt(segment.numberStart),
+            number_end: parseInt(segment.numberEnd),
+            side: 'both' as const,
+            building_type: 'mixed' as const,
+            geometry: geometry
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success(`${newSegmentsData.length} segments créés avec succès !`);
+      setShowSegmentNumbersDialog(false);
       exitEditMode();
+      await fetchData();
     } catch (error: any) {
       console.error("❌ Erreur lors de la sauvegarde:", error);
-      toast.error("Erreur lors de la sauvegarde des découpes");
+      toast.error("Erreur lors de la sauvegarde: " + error.message);
     }
   };
 
@@ -1132,6 +1254,84 @@ const ZoneMapAssignment = () => {
                 Aucun segment défini pour cette rue. Allez dans "Rues & Segments" pour en créer.
               </p>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog pour saisir les numéros de segments */}
+      <Dialog open={showSegmentNumbersDialog} onOpenChange={setShowSegmentNumbersDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Définir les numéros pour chaque segment</DialogTitle>
+            <DialogDescription>
+              Vous avez placé {cutMarkers.length} marqueur{cutMarkers.length > 1 ? 's' : ''}, ce qui crée {newSegmentsData.length} segment{newSegmentsData.length > 1 ? 's' : ''}.
+              Saisissez les numéros de début et de fin pour chaque segment.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {newSegmentsData.map((segment, index) => (
+              <div key={index} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm">Segment {index + 1}</span>
+                  <Badge variant="outline">
+                    {segment.start[0].toFixed(5)}, {segment.start[1].toFixed(5)} → {segment.end[0].toFixed(5)}, {segment.end[1].toFixed(5)}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`segment-${index}-start`}>Numéro de début</Label>
+                    <input
+                      id={`segment-${index}-start`}
+                      type="number"
+                      min="1"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Ex: 1"
+                      value={segment.numberStart}
+                      onChange={(e) => {
+                        const updated = [...newSegmentsData];
+                        updated[index].numberStart = e.target.value;
+                        setNewSegmentsData(updated);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`segment-${index}-end`}>Numéro de fin</Label>
+                    <input
+                      id={`segment-${index}-end`}
+                      type="number"
+                      min="1"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Ex: 50"
+                      value={segment.numberEnd}
+                      onChange={(e) => {
+                        const updated = [...newSegmentsData];
+                        updated[index].numberEnd = e.target.value;
+                        setNewSegmentsData(updated);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSegmentNumbersDialog(false);
+                setNewSegmentsData([]);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button onClick={confirmAndSaveSegments}>
+              <Save className="w-4 h-4 mr-2" />
+              Créer {newSegmentsData.length} segment{newSegmentsData.length > 1 ? 's' : ''}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
