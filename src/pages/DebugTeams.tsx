@@ -8,6 +8,8 @@ const DebugTeams = () => {
   const [teamMemberships, setTeamMemberships] = useState<any[]>([]);
   const [allTeams, setAllTeams] = useState<any[]>([]);
   const [teamSegments, setTeamSegments] = useState<any[]>([]);
+  const [volunteerQueryResult, setVolunteerQueryResult] = useState<any>(null);
+  const [queryError, setQueryError] = useState<any>(null);
 
   useEffect(() => {
     if (user) {
@@ -50,8 +52,50 @@ const DebugTeams = () => {
         .not("assigned_to_team_id", "is", null);
 
       setTeamSegments(segments || []);
+
+      // Test the exact query used in Volunteer.tsx
+      if (memberships && memberships.length > 0) {
+        const userTeamIds = memberships.map(tm => tm.team_id);
+        const queryFilter = `assigned_to_user_id.eq.${user.id}${userTeamIds.length > 0 ? `,assigned_to_team_id.in.(${userTeamIds.join(',')})` : ''}`;
+
+        console.log("🔍 Testing Volunteer.tsx query");
+        console.log("Query filter:", queryFilter);
+
+        const { data: volunteerSegments, error: volunteerError } = await supabase
+          .from("campaign_segments")
+          .select(`
+            id,
+            status,
+            assigned_to_user_id,
+            assigned_to_team_id,
+            campaign:campaigns(name, description),
+            segment:segments(
+              id,
+              number_start,
+              number_end,
+              side,
+              street:streets(name, type)
+            )
+          `)
+          .or(queryFilter)
+          .order("status");
+
+        if (volunteerError) {
+          console.error("❌ Query error:", volunteerError);
+          setQueryError(volunteerError);
+        } else {
+          console.log("✅ Query success! Found segments:", volunteerSegments?.length || 0);
+          setVolunteerQueryResult({
+            filter: queryFilter,
+            userTeamIds,
+            segmentsFound: volunteerSegments?.length || 0,
+            segments: volunteerSegments
+          });
+        }
+      }
     } catch (error: any) {
       console.error("Debug error:", error);
+      setQueryError(error);
     }
   };
 
@@ -108,6 +152,50 @@ const DebugTeams = () => {
           <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-96">
             {JSON.stringify(teamSegments, null, 2)}
           </pre>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>🔍 Volunteer.tsx Query Test</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {queryError ? (
+            <div className="bg-red-50 border border-red-200 rounded p-4">
+              <p className="text-red-700 font-bold">❌ Query Error:</p>
+              <pre className="text-xs bg-white p-2 rounded overflow-auto mt-2">
+                {JSON.stringify(queryError, null, 2)}
+              </pre>
+            </div>
+          ) : volunteerQueryResult ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded p-4">
+                <p className="text-green-700 font-bold">
+                  ✅ Query Success: {volunteerQueryResult.segmentsFound} segments found
+                </p>
+              </div>
+              <div>
+                <p className="font-bold mb-1">Query Filter:</p>
+                <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">
+                  {volunteerQueryResult.filter}
+                </pre>
+              </div>
+              <div>
+                <p className="font-bold mb-1">User Team IDs:</p>
+                <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto">
+                  {JSON.stringify(volunteerQueryResult.userTeamIds, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <p className="font-bold mb-1">Segments Found ({volunteerQueryResult.segmentsFound}):</p>
+                <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-96">
+                  {JSON.stringify(volunteerQueryResult.segments, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500">Loading query test...</p>
+          )}
         </CardContent>
       </Card>
     </div>
