@@ -24,8 +24,9 @@ L.Icon.Default.mergeOptions({
 interface Segment {
   id: string;
   street_id: string;
-  number_start: number;
-  number_end: number;
+  number_start?: number;
+  number_end?: number;
+  label?: string; // Descriptive label (e.g., "Partie Nord", "Segment 1")
   side: string;
   building_type: string;
   district_id: string | null;
@@ -89,8 +90,7 @@ const ZoneMapAssignment = () => {
   const [newSegmentsData, setNewSegmentsData] = useState<Array<{
     start: [number, number];
     end: [number, number];
-    numberStart: string;
-    numberEnd: string;
+    label: string;
   }>>([]);
   const markersRef = useRef<L.Marker[]>([]);
   const editModeRef = useRef(false); // Ref pour accéder à editMode dans les event handlers
@@ -179,6 +179,7 @@ const ZoneMapAssignment = () => {
             street_id,
             number_start,
             number_end,
+            label,
             side,
             building_type,
             district_id,
@@ -947,8 +948,7 @@ const ZoneMapAssignment = () => {
       segments.push({
         start: streetStart,
         end: markersWithDistance[0].coords,
-        numberStart: "",
-        numberEnd: ""
+        label: "Segment 1"
       });
 
       // Ajouter les segments entre chaque paire de marqueurs
@@ -956,8 +956,7 @@ const ZoneMapAssignment = () => {
         segments.push({
           start: markersWithDistance[i].coords,
           end: markersWithDistance[i + 1].coords,
-          numberStart: "",
-          numberEnd: ""
+          label: `Segment ${i + 2}`
         });
       }
 
@@ -976,11 +975,11 @@ const ZoneMapAssignment = () => {
 
       const streetEnd = normalizeCoord(getLastCoord(editingStreet.coordinates));
       console.log("📍 Fin de rue:", streetEnd);
+      const totalSegments = markersWithDistance.length + 1;
       segments.push({
         start: markersWithDistance[markersWithDistance.length - 1].coords,
         end: streetEnd,
-        numberStart: "",
-        numberEnd: ""
+        label: `Segment ${totalSegments}`
       });
 
       console.log("Segments créés:", segments);
@@ -998,16 +997,10 @@ const ZoneMapAssignment = () => {
     try {
       console.log("💾 Sauvegarde des segments dans la base de données");
 
-      // Valider que tous les numéros sont remplis
+      // Valider que tous les labels sont remplis
       for (const segment of newSegmentsData) {
-        if (!segment.numberStart || !segment.numberEnd) {
-          toast.error("Veuillez remplir tous les numéros de début et de fin");
-          return;
-        }
-        const start = parseInt(segment.numberStart);
-        const end = parseInt(segment.numberEnd);
-        if (isNaN(start) || isNaN(end) || start > end) {
-          toast.error("Les numéros doivent être valides et le début doit être inférieur à la fin");
+        if (!segment.label || segment.label.trim() === '') {
+          toast.error("Veuillez remplir tous les noms de segments");
           return;
         }
       }
@@ -1024,8 +1017,7 @@ const ZoneMapAssignment = () => {
           .from("segments")
           .insert({
             street_id: editingStreet.id,
-            number_start: parseInt(segment.numberStart),
-            number_end: parseInt(segment.numberEnd),
+            label: segment.label,
             side: 'both' as const,
             building_type: 'mixed' as const,
             geometry: geometry
@@ -1335,7 +1327,10 @@ const ZoneMapAssignment = () => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-medium">
-                            N° {segment.number_start} à {segment.number_end} • {getSideLabel(segment.side)}
+                            {segment.label
+                              ? `${segment.label} • ${getSideLabel(segment.side)}`
+                              : `N° ${segment.number_start} à ${segment.number_end} • ${getSideLabel(segment.side)}`
+                            }
                           </p>
                           <div className="flex items-center gap-2">
                             {segment.side === 'both' && (
@@ -1383,10 +1378,10 @@ const ZoneMapAssignment = () => {
       <Dialog open={showSegmentNumbersDialog} onOpenChange={setShowSegmentNumbersDialog}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto z-[10000]">
           <DialogHeader>
-            <DialogTitle>Définir les numéros pour chaque segment</DialogTitle>
+            <DialogTitle>Nommer les segments créés</DialogTitle>
             <DialogDescription>
               Vous avez placé {cutMarkers.length} marqueur{cutMarkers.length > 1 ? 's' : ''}, ce qui crée {newSegmentsData.length} segment{newSegmentsData.length > 1 ? 's' : ''}.
-              Saisissez les numéros de début et de fin pour chaque segment.
+              Donnez un nom à chaque segment (ex: "Partie Nord", "Segment 1", etc.).
             </DialogDescription>
           </DialogHeader>
 
@@ -1400,40 +1395,20 @@ const ZoneMapAssignment = () => {
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`segment-${index}-start`}>Numéro de début</Label>
-                    <input
-                      id={`segment-${index}-start`}
-                      type="number"
-                      min="1"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="Ex: 1"
-                      value={segment.numberStart}
-                      onChange={(e) => {
-                        const updated = [...newSegmentsData];
-                        updated[index].numberStart = e.target.value;
-                        setNewSegmentsData(updated);
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`segment-${index}-end`}>Numéro de fin</Label>
-                    <input
-                      id={`segment-${index}-end`}
-                      type="number"
-                      min="1"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="Ex: 50"
-                      value={segment.numberEnd}
-                      onChange={(e) => {
-                        const updated = [...newSegmentsData];
-                        updated[index].numberEnd = e.target.value;
-                        setNewSegmentsData(updated);
-                      }}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`segment-${index}-label`}>Nom du segment</Label>
+                  <input
+                    id={`segment-${index}-label`}
+                    type="text"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder={`Ex: Partie ${index === 0 ? 'Ouest' : index === newSegmentsData.length - 1 ? 'Est' : 'Centre'}`}
+                    value={segment.label}
+                    onChange={(e) => {
+                      const updated = [...newSegmentsData];
+                      updated[index].label = e.target.value;
+                      setNewSegmentsData(updated);
+                    }}
+                  />
                 </div>
               </div>
             ))}
