@@ -1362,7 +1362,7 @@ const ZoneMapAssignment = () => {
 
       {/* Dialog pour saisir les numéros de segments */}
       <Dialog open={showSegmentNumbersDialog} onOpenChange={setShowSegmentNumbersDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto z-[10000]">
           <DialogHeader>
             <DialogTitle>Définir les numéros pour chaque segment</DialogTitle>
             <DialogDescription>
