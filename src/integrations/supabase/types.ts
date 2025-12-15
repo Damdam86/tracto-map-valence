@@ -172,9 +172,10 @@ export type Database = {
           district_id: string | null
           geometry: Json | null
           id: string
+          label: string | null
           notes: string | null
-          number_end: number
-          number_start: number
+          number_end: number | null
+          number_start: number | null
           side: Database["public"]["Enums"]["segment_side"]
           street_id: string
           updated_at: string
@@ -185,9 +186,10 @@ export type Database = {
           district_id?: string | null
           geometry?: Json | null
           id?: string
+          label?: string | null
           notes?: string | null
-          number_end: number
-          number_start: number
+          number_end?: number | null
+          number_start?: number | null
           side?: Database["public"]["Enums"]["segment_side"]
           street_id: string
           updated_at?: string
@@ -198,9 +200,10 @@ export type Database = {
           district_id?: string | null
           geometry?: Json | null
           id?: string
+          label?: string | null
           notes?: string | null
-          number_end?: number
-          number_start?: number
+          number_end?: number | null
+          number_start?: number | null
           side?: Database["public"]["Enums"]["segment_side"]
           street_id?: string
           updated_at?: string
