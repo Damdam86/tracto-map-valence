@@ -29,6 +29,7 @@ interface Segment {
   side: string;
   building_type: string;
   district_id: string | null;
+  geometry: any | null; // Custom GPS geometry for segments created by cutting
 }
 
 interface Street {
@@ -180,7 +181,8 @@ const ZoneMapAssignment = () => {
             number_end,
             side,
             building_type,
-            district_id
+            district_id,
+            geometry
           )
         `)
         .not('coordinates', 'is', null)
@@ -300,13 +302,28 @@ const ZoneMapAssignment = () => {
 
           const totalPoints = line.length;
           segments.forEach((segment, segIndex) => {
-            const startRatio = segIndex / segments.length;
-            const endRatio = (segIndex + 1) / segments.length;
+            // Check if segment has custom geometry
+            let segmentLine: [number, number][];
 
-            const startIdx = Math.floor(startRatio * (totalPoints - 1));
-            const endIdx = Math.ceil(endRatio * (totalPoints - 1));
+            if (segment.geometry && segment.geometry.coordinates && Array.isArray(segment.geometry.coordinates)) {
+              // Use custom geometry from segment
+              console.log(`📍 Using custom geometry for segment ${segment.id}:`, segment.geometry);
+              segmentLine = segment.geometry.coordinates.map((coord: any) => {
+                if (Array.isArray(coord) && coord.length === 2) {
+                  return [Number(coord[0]), Number(coord[1])] as [number, number];
+                }
+                return [0, 0] as [number, number];
+              });
+            } else {
+              // Use proportional division of street line (existing logic)
+              const startRatio = segIndex / segments.length;
+              const endRatio = (segIndex + 1) / segments.length;
 
-            const segmentLine = line.slice(startIdx, endIdx + 1);
+              const startIdx = Math.floor(startRatio * (totalPoints - 1));
+              const endIdx = Math.ceil(endRatio * (totalPoints - 1));
+
+              segmentLine = line.slice(startIdx, endIdx + 1);
+            }
 
             if (segmentLine.length >= 2) {
               const isSegmentSelected = selectedSegments.has(segment.id);
@@ -561,7 +578,8 @@ const ZoneMapAssignment = () => {
               number_end,
               side,
               building_type,
-              district_id
+              district_id,
+              geometry
             )
           `)
           .eq("id", selectedStreetForSegments.id)
@@ -670,7 +688,8 @@ const ZoneMapAssignment = () => {
               number_end,
               side,
               building_type,
-              district_id
+              district_id,
+              geometry
             )
           `)
           .eq("id", selectedStreetForSegments.id)
