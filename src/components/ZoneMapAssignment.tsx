@@ -614,6 +614,55 @@ const ZoneMapAssignment = () => {
     }
   };
 
+  const handleDeleteAllSegments = async (streetId: string) => {
+    if (!confirm("⚠️ Supprimer TOUS les segments de cette rue ?\n\nCela permettra de recommencer avec le nouveau système simplifié (avec labels).")) return;
+
+    try {
+      const { error } = await supabase
+        .from("segments")
+        .delete()
+        .eq("street_id", streetId);
+
+      if (error) throw error;
+      toast.success("Tous les segments ont été supprimés. Vous pouvez maintenant recréer des segments simplifiés.");
+
+      // Rafraîchir les données
+      await fetchData();
+
+      // Mettre à jour les données de la rue affichée dans le dialog
+      if (selectedStreetForSegments) {
+        const { data: updatedStreet } = await supabase
+          .from("streets")
+          .select(`
+            id,
+            name,
+            type,
+            coordinates,
+            segments (
+              id,
+              street_id,
+              number_start,
+              number_end,
+              label,
+              side,
+              building_type,
+              district_id,
+              geometry
+            )
+          `)
+          .eq("id", selectedStreetForSegments.id)
+          .single();
+
+        if (updatedStreet) {
+          setSelectedStreetForSegments(updatedStreet as any);
+        }
+      }
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la suppression des segments:", error);
+      toast.error("Erreur lors de la suppression des segments");
+    }
+  };
+
   const handleSplitSegment = async (segment: Segment) => {
     if (segment.side !== 'both') {
       toast.error("Ce segment est déjà divisé par côté");
@@ -1247,6 +1296,16 @@ const ZoneMapAssignment = () => {
                     >
                       <Scissors className="w-4 h-4 mr-1" />
                       Mode découpe
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedStreetForSegments && handleDeleteAllSegments(selectedStreetForSegments.id)}
+                      className="text-orange-600 hover:text-orange-700"
+                      disabled={!selectedStreetForSegments?.segments || selectedStreetForSegments.segments.length === 0}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Supprimer les segments
                     </Button>
                     <Button
                       variant="ghost"
