@@ -193,6 +193,19 @@ const ZoneMapAssignment = () => {
 
       console.log(`Total streets in DB: ${totalStreets}, Streets with coordinates: ${streetsData?.length || 0}`);
 
+      // DEBUG: Vérifier les segments avec géométrie
+      const streetsWithGeometry = streetsData?.filter((street: any) =>
+        street.segments?.some((s: any) => s.geometry)
+      );
+      console.log('🔍 DEBUG - Streets with custom geometry segments:', streetsWithGeometry?.length || 0);
+      streetsWithGeometry?.forEach((street: any) => {
+        const segmentsWithGeom = street.segments.filter((s: any) => s.geometry);
+        console.log(`  ↳ ${street.name}: ${segmentsWithGeom.length} segments avec geometry`);
+        segmentsWithGeom.forEach((seg: any) => {
+          console.log(`    - Segment ${seg.id}:`, seg.geometry);
+        });
+      });
+
       if (!streetsData || streetsData.length === 0) {
         if (totalStreets && totalStreets > 0) {
           toast.info(`Aucune rue avec coordonnées GPS trouvée.`, { duration: 5000 });
