@@ -344,16 +344,16 @@ const ZoneMapAssignment = () => {
               polyline.bindTooltip(tooltipText, { direction: 'top' });
 
               polyline.on('click', (e) => {
-                console.log('🖱️ Clic sur polyline:', { editModeRef: editModeRef.current, street: street.name });
+                console.log('🖱️ Clic sur polyline:', { editModeRef: editModeRef.current, street: street.name, segment: segment.id });
                 if (editModeRef.current) {
                   // En mode découpe, placer un marqueur
                   console.log('✂️ Mode découpe actif - placement marqueur');
                   handleMapClick(e);
                 } else {
-                  // Sinon, ouvrir le dialog
-                  console.log('📋 Mode normal - ouverture dialog');
+                  // Sinon, ouvrir le dialog et sélectionner automatiquement ce segment
+                  console.log('📋 Mode normal - ouverture dialog avec segment:', segment.id);
                   L.DomEvent.stopPropagation(e);
-                  handleStreetClick(street);
+                  handleStreetClick(street, segment.id);
                 }
               });
 
@@ -495,8 +495,15 @@ const ZoneMapAssignment = () => {
     }
   };
 
-  const handleStreetClick = (street: Street) => {
+  const handleStreetClick = (street: Street, segmentId?: string) => {
     setSelectedStreetForSegments(street);
+    // Si un segment spécifique est cliqué, le sélectionner automatiquement
+    if (segmentId) {
+      const newSelection = new Set(selectedSegments);
+      newSelection.add(segmentId);
+      setSelectedSegments(newSelection);
+      console.log(`✅ Segment ${segmentId} auto-sélectionné au clic`);
+    }
   };
 
   const toggleSegment = (segmentId: string) => {
