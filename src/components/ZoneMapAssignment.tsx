@@ -285,13 +285,22 @@ const ZoneMapAssignment = () => {
           (evenSegments.some(s => s.district_id) || oddSegments.some(s => s.district_id));
 
         const uniqueZones = new Set(sortedSegments.map(s => s.district_id).filter(Boolean));
-        const shouldDivideBySegments = uniqueZones.size > 1 && sortedSegments.length > 1 && !isMultiLineString;
+
+        // Vérifier si au moins un segment a une géométrie personnalisée (créé par découpe)
+        const hasCustomGeometry = sortedSegments.some(s => s.geometry && s.geometry.coordinates);
+
+        // Diviser en segments si : plusieurs zones OU géométrie custom OU sélection en cours
+        const shouldDivideBySegments =
+          (uniqueZones.size > 1 || hasCustomGeometry || hasSelectedSegments) &&
+          sortedSegments.length > 1 &&
+          !isMultiLineString;
 
         console.log(`📍 ${street.name}:`, {
           segments: sortedSegments.length,
           evenSegments: evenSegments.length,
           oddSegments: oddSegments.length,
           hasMultipleSides,
+          hasCustomGeometry,
           shouldDivideBySegments,
           uniqueZones: uniqueZones.size,
           isMultiLineString
